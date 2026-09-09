@@ -20,4 +20,4 @@ yarn-error.log*
 # Uploaded test media (keeps directory structure)
 backend/uploads/*
 public/uploads/*
-!.gitkeep
+!.gitkeep*.zip
