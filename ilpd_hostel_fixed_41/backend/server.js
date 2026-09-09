@@ -9,14 +9,17 @@ const app = express();
 
 app.use(helmet());
 
-// ✅ FIXED CORS - Allow Vercel frontend and Render backend
+// ✅ CORRECTED CORS CONFIGURATION - Allow Vercel frontend
 app.use(cors({
   origin: [
+    'https://ilpd-hostel-application.vercel.app',
     'https://ilpd-hostel-app.vercel.app',
-    'https://ilpd-hostel-1.onrender.com',
+    'https://ilpd-hostel-n.vercel.app',
     'http://localhost:3000'
   ],
-  credentials: true
+  credentials: true,
+  methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
+  allowedHeaders: ['Content-Type', 'Authorization']
 }));
 
 app.use("/api/bookings/webhook", express.raw({ type: "application/json" }));
@@ -59,8 +62,6 @@ mongoose.connect(process.env.MONGO_URI)
   .then(() => {
     console.log("MongoDB connected");
     const server = app.listen(process.env.PORT || 5000, () => console.log(`Server running on port ${process.env.PORT || 5000}`));
-    // Configure Node's HTTP server, not the Express app object.
-    // This gives legitimate DB/payment operations enough time to finish.
     server.requestTimeout = 60000;
     server.headersTimeout = 65000;
     server.keepAliveTimeout = 5000;
