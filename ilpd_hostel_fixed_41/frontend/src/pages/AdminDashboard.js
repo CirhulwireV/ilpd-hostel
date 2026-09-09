@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from "react";
+import React, { useEffect, useState, useCallback } from "react";
 import API from "../api/axios";
 
 const TABS = ["Overview", "Reports", "Bookings", "Rooms", "Clients", "Guest Support", "Surveys"];
@@ -6,26 +6,67 @@ const TABS = ["Overview", "Reports", "Bookings", "Rooms", "Clients", "Guest Supp
 function PriceEditor({ room, onSave }) {
   const [editing, setEditing] = useState(false);
   const [value, setValue] = useState(room.price);
-  useEffect(() => { setValue(room.price); }, [room.price]);
+  
+  useEffect(() => { 
+    setValue(room.price); 
+  }, [room.price]);
+  
   if (!editing) {
     return (
-      <button type="button" onClick={() => setEditing(true)} style={{ background: "none", border: "none", padding: 0, cursor: "pointer", fontWeight: "700", textDecoration: "underline dotted", color: "inherit" }} title="Click to change price">
+      <button 
+        type="button" 
+        onClick={() => setEditing(true)} 
+        style={{ 
+          background: "none", 
+          border: "none", 
+          padding: 0, 
+          cursor: "pointer", 
+          fontWeight: "700", 
+          textDecoration: "underline dotted", 
+          color: "inherit" 
+        }} 
+        title="Click to change price"
+      >
         {Number(room.price || 0).toLocaleString()} RWF
       </button>
     );
   }
+  
   return (
     <div style={{ display: "flex", gap: "4px", alignItems: "center" }}>
-      <input type="number" min="1" value={value} onChange={(e) => setValue(e.target.value)} style={{ width: "90px", marginBottom: 0, fontSize: "13px" }} autoFocus />
-      <button className="btn btn-primary" style={{ padding: "4px 8px", fontSize: "12px" }} onClick={() => { onSave(room._id, value); setEditing(false); }}>Save</button>
-      <button className="btn btn-secondary" style={{ padding: "4px 8px", fontSize: "12px" }} onClick={() => { setValue(room.price); setEditing(false); }}>✕</button>
+      <input 
+        type="number" 
+        min="1" 
+        value={value} 
+        onChange={(e) => setValue(e.target.value)} 
+        style={{ width: "90px", marginBottom: 0, fontSize: "13px" }} 
+        autoFocus 
+      />
+      <button 
+        className="btn btn-primary" 
+        style={{ padding: "4px 8px", fontSize: "12px" }} 
+        onClick={() => { 
+          onSave(room._id, value); 
+          setEditing(false); 
+        }}
+      >
+        Save
+      </button>
+      <button 
+        className="btn btn-secondary" 
+        style={{ padding: "4px 8px", fontSize: "12px" }} 
+        onClick={() => { 
+          setValue(room.price); 
+          setEditing(false); 
+        }}
+      >
+        ✕
+      </button>
     </div>
   );
 }
 
 const fmt = (n) => `${Number(n || 0).toLocaleString()} RWF`;
-
-const getHostelSectionLabel = (roomNumber, section) => section || "";
 
 const STATUS_COLORS = {
   pending: { bg: "#fefcbf", color: "#744210" },
@@ -37,8 +78,8 @@ const STATUS_COLORS = {
 };
 
 export default function AdminDashboard() {
+  // ============ STATE DECLARATIONS ============
   const [confirmDialog, setConfirmDialog] = useState(null);
-  const askConfirm = (message, onConfirm) => setConfirmDialog({ message, onConfirm });
   const [tab, setTab] = useState("Overview");
   const [bookingSubTab, setBookingSubTab] = useState("Waiting List");
   const [highlightBookingId, setHighlightBookingId] = useState(null);
@@ -59,7 +100,12 @@ export default function AdminDashboard() {
   const [categories, setCategories] = useState([]);
   const [structureMsg, setStructureMsg] = useState("");
   const [structureError, setStructureError] = useState("");
-  const [blockForm, setBlockForm] = useState({ name: "", accommodationType: "outside_hostel", usesCategories: true, description: "" });
+  const [blockForm, setBlockForm] = useState({ 
+    name: "", 
+    accommodationType: "outside_hostel", 
+    usesCategories: true, 
+    description: "" 
+  });
   const [editingBlock, setEditingBlock] = useState(null);
   const [expandedBlock, setExpandedBlock] = useState(null);
   const [subBlockForm, setSubBlockForm] = useState({});
@@ -67,7 +113,12 @@ export default function AdminDashboard() {
   const [editingSubBlock, setEditingSubBlock] = useState(null);
   const [editingSubBlockParent, setEditingSubBlockParent] = useState("");
   const [subBlockName, setSubBlockName] = useState("");
-  const [catForm, setCatForm] = useState({ name: "", price: "", description: "", capacity: 2 });
+  const [catForm, setCatForm] = useState({ 
+    name: "", 
+    price: "", 
+    description: "", 
+    capacity: 2 
+  });
   const [editingCat, setEditingCat] = useState(null);
   const [editingRoom, setEditingRoom] = useState(null);
   const [editRoomForm, setEditRoomForm] = useState({});
@@ -82,29 +133,6 @@ export default function AdminDashboard() {
   const [clientMsg, setClientMsg] = useState("");
   const [clientError, setClientError] = useState("");
   const [showStructure, setShowStructure] = useState(false);
-  const currentUserId = (() => {
-    try { return JSON.parse(localStorage.getItem("user"))?._id || JSON.parse(localStorage.getItem("user"))?.id; } catch { return null; }
-  })();
-
-  const jumpToBooking = (booking, subTab) => {
-    setTab("Bookings");
-    setBookingSubTab(subTab);
-    setBookingsShown(9999);
-    setHighlightBookingId(booking._id);
-  };
-
-  useEffect(() => {
-    if (!highlightBookingId || tab !== "Bookings") return;
-    const el = document.getElementById(`booking-row-${highlightBookingId}`);
-    if (el) {
-      el.scrollIntoView({ behavior: "smooth", block: "center" });
-      el.style.transition = "box-shadow 0.3s";
-      el.style.boxShadow = "0 0 0 3px #c9960d";
-      const t = setTimeout(() => { el.style.boxShadow = "none"; setHighlightBookingId(null); }, 2500);
-      return () => clearTimeout(t);
-    }
-  }, [highlightBookingId, tab, bookingSubTab]);
-  
   const [msg, setMsg] = useState("");
   const [search, setSearch] = useState("");
   const [responseText, setResponseText] = useState({});
@@ -124,7 +152,17 @@ export default function AdminDashboard() {
   const [allocateRoomId, setAllocateRoomId] = useState([]);
   const [allocationRooms, setAllocationRooms] = useState([]);
   const [showAddRoom, setShowAddRoom] = useState(false);
-  const [newRoom, setNewRoom] = useState({ roomNumber: "", category: "", accommodationType: "outside_hostel", hostelSection: "", price: "", address: "Nyanza, Southern Province, Rwanda", images: [], imageData: "", imageName: "" });
+  const [newRoom, setNewRoom] = useState({ 
+    roomNumber: "", 
+    category: "", 
+    accommodationType: "outside_hostel", 
+    hostelSection: "", 
+    price: "", 
+    address: "Nyanza, Southern Province, Rwanda", 
+    images: [], 
+    imageData: "", 
+    imageName: "" 
+  });
   const [addRoomError, setAddRoomError] = useState("");
   const [addingRoom, setAddingRoom] = useState(false);
   const [bulkMode, setBulkMode] = useState(false);
@@ -133,218 +171,61 @@ export default function AdminDashboard() {
   const [bulkCount, setBulkCount] = useState("5");
   const [bulkCreating, setBulkCreating] = useState(false);
 
-  useEffect(() => {
-    API.get("/bookings").then(({ data }) => setBookings(data)).catch((err) => setBookingError(err.response?.data?.message || "Unable to load bookings."));
-    API.get("/bookings/report").then(({ data }) => setWeeklyReport(data)).catch((err) => setReportError(err.response?.data?.message || "Unable to load weekly report."));
-    API.get("/rooms").then(({ data }) => setRooms(data)).catch((err) => setAddRoomError(err.response?.data?.message || "Unable to load rooms."));
-    API.get("/auth/clients").then(({ data }) => setClients(data)).catch(() => {});
-    API.get("/concerns").then(({ data }) => setConcerns(data.concerns || data)).catch(() => {});
-    API.get("/surveys").then(({ data }) => setSurveys(data)).catch(() => {});
-    API.get("/rooms/blocks").then(({ data }) => setKnownBlocks(data)).catch(() => {});
-    API.get("/hostel-structure/blocks?activeOnly=false").then(({ data }) => {
-      console.log("Loaded blocks:", data);
-      setBlocks(data);
-    }).catch((err) => console.error("Error loading blocks:", err));
-    API.get("/hostel-structure/categories?activeOnly=false").then(({ data }) => setCategories(data)).catch(() => {});
-    API.get("/surveys/questions/all").then(({ data }) => setSurveyQuestions(data)).catch(() => {});
+  const currentUserId = (() => {
+    try { 
+      return JSON.parse(localStorage.getItem("user"))?._id || JSON.parse(localStorage.getItem("user"))?.id; 
+    } catch { 
+      return null; 
+    }
+  })();
+
+  // ============ HELPER FUNCTIONS ============
+  const askConfirm = useCallback((message, onConfirm) => {
+    setConfirmDialog({ message, onConfirm });
   }, []);
 
-  useEffect(() => {
-    setMonthlyReportError("");
-    API.get("/bookings/monthly-report", { params: { month: monthlyReportMonth } })
-      .then(({ data }) => setMonthlyReport(data))
-      .catch((err) => setMonthlyReportError(err.response?.data?.message || "Unable to load monthly performance."));
-  }, [monthlyReportMonth]);
-
-  const updateConcernResponse = async (id, currentResponse = "") => {
-    setResponseMsg("");
-    setResponseError("");
-    const response = (responseText[id] ?? currentResponse)?.trim();
-    if (!response) {
-      setResponseError("Enter a response before submitting.");
-      return;
-    }
-    try {
-      const { data } = await API.put(`/concerns/${id}/respond`, { response });
-      setConcerns((prev) => prev.map((c) => (c._id === id ? data : c)));
-      setResponseMsg("Concern response saved successfully.");
-      setResponseText((prev) => ({ ...prev, [id]: "" }));
-    } catch (err) {
-      setResponseError(err.response?.data?.message || "Unable to save response.");
-    }
-  };
-
-  const openAllocation = async (booking) => {
-    setBookingError("");
-    setBookingMsg("");
-    setAllocatingId(booking._id);
-    setAllocateRoomId([]);
-    try {
-      const { data } = await API.get("/rooms/available-for-booking", {
-        params: { category: booking.category, accommodationType: booking.accommodationType || "outside_hostel", checkIn: booking.checkIn, checkOut: booking.checkOut },
-      });
-      setAllocationRooms(data);
-      if (!data.length) setBookingError("No room is available for these booking dates.");
-    } catch (err) {
-      setAllocationRooms([]);
-      setBookingError(err.response?.data?.message || "Unable to load available rooms.");
-    }
-  };
-
-  const allocateRoom = async (id) => {
-    if (!allocateRoomId.length) { setBookingError("Please select the required number of rooms."); return; }
-    try {
-      const { data } = await API.put(`/bookings/${id}/allocate`, { roomIds: allocateRoomId });
-      setBookings((prev) => prev.map((b) => (b._id === id ? data : b)));
-      setAllocatingId(null);
-      setAllocateRoomId([]);
-      setBookingMsg("Room allocated successfully.");
-      setBookingError("");
-      await refreshRooms();
-      if (weeklyReport) API.get("/bookings/report").then(({ data }) => setWeeklyReport(data)).catch(() => {});
-    } catch (err) {
-      setBookingError(err.response?.data?.message || "Unable to allocate room.");
-    }
-  };
-
-  const cancelBooking = async (id) => {
-    try {
-      const { data } = await API.post(`/bookings/cancel/${id}`);
-      setBookings((prev) => prev.filter((b) => b._id !== id));
-      if (weeklyReport) {
-        API.get("/bookings/report").then(({ data }) => setWeeklyReport(data)).catch(() => {});
-      }
-      setBookingMsg(data.message);
-      setBookingError("");
-      await refreshRooms();
-    } catch (err) {
-      setBookingError(err.response?.data?.message || "Unable to cancel booking.");
-    }
-  };
-
-  const recordOccupantStatus = (bookingId, occupantId, status, name) => {
-    const action = status === "checked-in" ? "check in" : "check out";
-    askConfirm(`${status === "checked-in" ? "Check in" : "Record"} ${name || "this person"}${status === "checked-out" ? " as checked out?" : "?"}`, async () => {
-      try {
-        const { data } = await API.put(`/bookings/${bookingId}/occupants/${occupantId}/status`, { status });
-        setBookings((prev) => prev.map((b) => (b._id === bookingId ? data.booking : b)));
-        setBookingMsg(`${name || "Occupant"} ${status === "checked-in" ? "checked in" : "checked out"}.`);
-        setBookingError("");
-        await refreshRooms();
-      } catch (err) { setBookingError(err.response?.data?.message || `Unable to ${action} occupant.`); }
-    });
-  };
-
-  const recordCheckin = (id) => {
-    askConfirm("Record check-in now?", async () => {
-      try {
-        const { data } = await API.put(`/bookings/${id}/status`, { status: "checked-in" });
-        setBookings((prev) => prev.map((b) => (b._id === id ? data : b)));
-        setBookingMsg("Check-in recorded successfully.");
-        setBookingError("");
-        await refreshRooms();
-        if (weeklyReport) API.get("/bookings/report").then(({ data: report }) => setWeeklyReport(report)).catch(() => {});
-      } catch (err) {
-        setBookingError(err.response?.data?.message || "Unable to record check-in.");
-      }
-    });
-  };
-
-  const recordCheckout = (id) => {
-    askConfirm("Record checkout now?", async () => {
-      try {
-        const { data } = await API.put(`/bookings/${id}/status`, { status: "checked-out" });
-        setBookings((prev) => prev.map((b) => (b._id === id ? data : b)));
-        setBookingMsg("Checkout recorded.");
-        setBookingError("");
-        await refreshRooms();
-        if (weeklyReport) API.get("/bookings/report").then(({ data: report }) => setWeeklyReport(report)).catch(() => {});
-      } catch (err) {
-        setBookingError(err.response?.data?.message || "Unable to record checkout.");
-      }
-    });
-  };
-
-  const deleteBookingRecord = (id) => {
-    askConfirm("Permanently delete this booking record? This can't be undone.", () => deleteBookingRecordConfirmed(id));
-  };
-
-  const deleteBookingRecordConfirmed = async (id) => {
-    try {
-      await API.delete(`/bookings/${id}/history`);
-      setBookings((prev) => prev.filter((b) => b._id !== id));
-      setBookingMsg("Booking record deleted.");
-      setBookingError("");
-      await refreshRooms();
-      if (weeklyReport) API.get("/bookings/report").then(({ data }) => setWeeklyReport(data)).catch(() => {});
-    } catch (err) {
-      setBookingError(err.response?.data?.message || "Unable to delete this booking.");
-    }
-  };
-
-  const refreshRooms = async () => {
+  // ============ REFRESH FUNCTIONS ============
+  const refreshRooms = useCallback(async () => {
     try {
       const { data } = await API.get("/rooms");
       setRooms(data);
     } catch (_) {}
-  };
+  }, []);
 
-  const setClientRole = async (id, role, name) => {
-    setClientError("");
-    setClientMsg("");
+  const refreshStructure = useCallback(async () => {
     try {
-      const { data } = await API.put(`/auth/clients/${id}/role`, { role });
-      setClients((prev) => prev.map((c) => (c._id === id ? { ...c, role } : c)));
-      setClientMsg(data.message);
+      setStructureMsg("");
+      setStructureError("");
+      
+      const [blocksRes, categoriesRes] = await Promise.all([
+        API.get("/hostel-structure/blocks?activeOnly=false"),
+        API.get("/hostel-structure/categories?activeOnly=false"),
+      ]);
+      
+      setBlocks(blocksRes.data || []);
+      setCategories(categoriesRes.data || []);
     } catch (err) {
-      setClientError(err.response?.data?.message || `Could not update ${name}'s role.`);
+      setStructureError(err.response?.data?.message || "Could not load hostel structure.");
+      console.error("Refresh structure error:", err);
     }
-  };
+  }, []);
 
-  const addSurveyQuestion = async () => {
-    if (!newSurveyQuestion.trim()) return;
-    setSurveyQuestionMsg("");
-    try {
-      const { data } = await API.post("/surveys/questions", { text: newSurveyQuestion.trim() });
-      setSurveyQuestions((prev) => [...prev, data]);
-      setNewSurveyQuestion("");
-    } catch (err) {
-      setSurveyQuestionMsg(err.response?.data?.message || "Could not add this question.");
-    }
-  };
+  // ============ DELETE ROOM FUNCTION ============
+  const deleteRoom = useCallback(async (id) => {
+    askConfirm("Delete this room permanently? This cannot be undone.", async () => {
+      try {
+        await API.delete(`/rooms/${id}`);
+        setRooms((prev) => prev.filter((r) => r._id !== id));
+        setMsg("Room deleted successfully.");
+        await refreshRooms();
+      } catch (err) {
+        setAddRoomError(err.response?.data?.message || "Could not delete room.");
+      }
+    });
+  }, [askConfirm, refreshRooms]);
 
-  const toggleSurveyQuestion = async (q) => {
-    try {
-      const { data } = await API.put(`/surveys/questions/${q._id}`, { active: !q.active });
-      setSurveyQuestions((prev) => prev.map((x) => (x._id === q._id ? data : x)));
-    } catch (err) {
-      setSurveyQuestionMsg(err.response?.data?.message || "Could not update this question.");
-    }
-  };
-
-  const deleteSurveyQuestion = async (id) => {
-    try {
-      await API.delete(`/surveys/questions/${id}`);
-      setSurveyQuestions((prev) => prev.filter((q) => q._id !== id));
-    } catch (err) {
-      setSurveyQuestionMsg(err.response?.data?.message || "Could not delete this question.");
-    }
-  };
-
-  const checkRoomHealth = async (dryRun) => {
-    setHealthChecking(true);
-    try {
-      const { data } = await API.post(`/rooms/health-check?dryRun=${dryRun}`);
-      setHealthResult(data);
-      if (!dryRun) await refreshRooms();
-    } catch (err) {
-      setHealthResult({ message: err.response?.data?.message || "Could not check room health.", duplicateGroupsFound: 0 });
-    } finally {
-      setHealthChecking(false);
-    }
-  };
-
-  const updateRoomStatus = async (id, status) => {
+  // ============ UPDATE ROOM STATUS ============
+  const updateRoomStatus = useCallback(async (id, status) => {
     try {
       const { data } = await API.put(`/rooms/${id}`, { status });
       setRooms((prev) => prev.map((r) => (r._id === id ? data : r)));
@@ -352,9 +233,10 @@ export default function AdminDashboard() {
     } catch (err) {
       setAddRoomError(err.response?.data?.message || "Unable to update room status.");
     }
-  };
+  }, []);
 
-  const updateRoomPrice = async (id, price) => {
+  // ============ UPDATE ROOM PRICE ============
+  const updateRoomPrice = useCallback(async (id, price) => {
     const numericPrice = Number(price);
     if (!Number.isFinite(numericPrice) || numericPrice <= 0) return;
     try {
@@ -364,46 +246,27 @@ export default function AdminDashboard() {
     } catch (err) {
       setAddRoomError(err.response?.data?.message || "Unable to update price.");
     }
-  };
+  }, []);
 
-  const readRoomImage = (file, callback) => {
-    if (!file) return;
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      setAddRoomError("Please choose a JPG, PNG, or WebP image.");
-      return;
-    }
-    if (file.size > 3 * 1024 * 1024) {
-      setAddRoomError("Image must be 3 MB or smaller.");
-      return;
-    }
-    const reader = new FileReader();
-    reader.onload = () => callback(String(reader.result), file.name);
-    reader.onerror = () => setAddRoomError("Unable to read the selected image.");
-    reader.readAsDataURL(file);
-  };
-
-  const MAX_ROOM_PHOTOS = 5;
-  const addRoomPhotos = (files) => {
-    const list = Array.from(files || []);
-    if (!list.length) return;
-    if (newRoom.images.length + list.length > MAX_ROOM_PHOTOS) {
-      setAddRoomError(`You can upload up to ${MAX_ROOM_PHOTOS} photos per room.`);
-      return;
-    }
-    setAddRoomError("");
-    list.forEach((file) => {
-      readRoomImage(file, (imageData) => {
-        setNewRoom((r) => (r.images.length >= MAX_ROOM_PHOTOS ? r : { ...r, images: [...r.images, imageData] }));
+  // ============ CHECK ROOM HEALTH ============
+  const checkRoomHealth = useCallback(async (dryRun) => {
+    setHealthChecking(true);
+    try {
+      const { data } = await API.post(`/rooms/health-check?dryRun=${dryRun}`);
+      setHealthResult(data);
+      if (!dryRun) await refreshRooms();
+    } catch (err) {
+      setHealthResult({ 
+        message: err.response?.data?.message || "Could not check room health.", 
+        duplicateGroupsFound: 0 
       });
-    });
-  };
+    } finally {
+      setHealthChecking(false);
+    }
+  }, [refreshRooms]);
 
-  const removeRoomPhoto = (index) => {
-    setNewRoom((r) => ({ ...r, images: r.images.filter((_, i) => i !== index) }));
-  };
-
-  // ✅ CLOUDINARY UPLOAD FUNCTION
-  const uploadRoomPhotosToCloudinary = async (imageDataUrls) => {
+  // ============ IMAGE UPLOAD ============
+  const uploadRoomPhotosToCloudinary = useCallback(async (imageDataUrls) => {
     if (!imageDataUrls?.length) return [];
     
     const formData = new FormData();
@@ -420,12 +283,13 @@ export default function AdminDashboard() {
     
     const { data } = await API.post("/upload/rooms/images", formData);
     return data.images;
-  };
+  }, []);
 
-  // ✅ UPDATED createRoom
-  const createRoom = async (e) => {
+  // ============ CREATE ROOM ============
+  const createRoom = useCallback(async (e) => {
     e.preventDefault();
     setAddRoomError("");
+    
     if (!newRoom.roomNumber.trim()) {
       setAddRoomError("Room number is required.");
       return;
@@ -446,6 +310,7 @@ export default function AdminDashboard() {
       setAddRoomError("Enter the location.");
       return;
     }
+    
     setAddingRoom(true);
     try {
       const images = await uploadRoomPhotosToCloudinary(newRoom.images);
@@ -461,18 +326,29 @@ export default function AdminDashboard() {
       setRooms((prev) => [...prev, data].sort((a, b) => a.roomNumber.localeCompare(b.roomNumber)));
       setMsg(`Room ${data.roomNumber} created successfully.`);
       API.get("/rooms/blocks").then(({ data: b }) => setKnownBlocks(b)).catch(() => {});
-      setNewRoom({ roomNumber: "", category: "", accommodationType: "outside_hostel", hostelSection: "", price: "", address: "Nyanza, Southern Province, Rwanda", images: [], imageData: "", imageName: "" });
+      setNewRoom({ 
+        roomNumber: "", 
+        category: "", 
+        accommodationType: "outside_hostel", 
+        hostelSection: "", 
+        price: "", 
+        address: "Nyanza, Southern Province, Rwanda", 
+        images: [], 
+        imageData: "", 
+        imageName: "" 
+      });
       setShowAddRoom(false);
     } catch (err) {
       setAddRoomError(err.response?.data?.message || "Could not create room.");
     } finally {
       setAddingRoom(false);
     }
-  };
+  }, [newRoom, uploadRoomPhotosToCloudinary]);
 
-  // ✅ UPDATED createBulkRooms
-  const createBulkRooms = async () => {
+  // ============ CREATE BULK ROOMS ============
+  const createBulkRooms = useCallback(async () => {
     setAddRoomError("");
+    
     if (!newRoom.price || Number(newRoom.price) <= 0) {
       setAddRoomError("Enter a price greater than 0.");
       return;
@@ -489,6 +365,7 @@ export default function AdminDashboard() {
       setAddRoomError("Create and select a category first.");
       return;
     }
+    
     setBulkCreating(true);
     try {
       const numbers = bulkRoomNumbers.split(",").map((n) => n.trim()).filter(Boolean);
@@ -501,6 +378,7 @@ export default function AdminDashboard() {
         address: newRoom.address,
         images,
       };
+      
       if (numbers.length) {
         payload.roomNumbers = numbers;
       } else {
@@ -512,14 +390,27 @@ export default function AdminDashboard() {
         payload.startNumber = Number(bulkStartNumber);
         payload.count = Number(bulkCount);
       }
+      
       const { data } = await API.post("/rooms/bulk", payload);
-      setRooms((prev) => [...prev, ...data.rooms].sort((a, b) => a.roomNumber.localeCompare(b.roomNumber, undefined, { numeric: true })));
+      setRooms((prev) => [...prev, ...data.rooms].sort((a, b) => 
+        a.roomNumber.localeCompare(b.roomNumber, undefined, { numeric: true })
+      ));
       setMsg(`${data.count} rooms created successfully.`);
       API.get("/rooms/blocks").then(({ data: b }) => setKnownBlocks(b)).catch(() => {});
       setBulkRoomNumbers("");
       setBulkStartNumber("");
       setBulkCount("5");
-      setNewRoom({ roomNumber: "", category: "", accommodationType: "outside_hostel", hostelSection: "", price: "", address: "Nyanza, Southern Province, Rwanda", images: [], imageData: "", imageName: "" });
+      setNewRoom({ 
+        roomNumber: "", 
+        category: "", 
+        accommodationType: "outside_hostel", 
+        hostelSection: "", 
+        price: "", 
+        address: "Nyanza, Southern Province, Rwanda", 
+        images: [], 
+        imageData: "", 
+        imageName: "" 
+      });
       setShowAddRoom(false);
       setBulkMode(false);
     } catch (err) {
@@ -527,67 +418,217 @@ export default function AdminDashboard() {
     } finally {
       setBulkCreating(false);
     }
-  };
+  }, [newRoom, bulkRoomNumbers, bulkStartNumber, bulkCount, uploadRoomPhotosToCloudinary]);
 
-  // Hostel Structure Functions
-  useEffect(() => {
-    if (!blocks.length) return;
-    setNewRoom((r) => {
-      const currentBlock = blocks.find((b) => b.name === r.hostelSection);
-      const block = currentBlock || blocks.find((b) => b.active !== false);
-      const activeCategories = categories.filter((c) => c.active);
-      const categoryStillExists = activeCategories.some((c) => c.name === r.category);
-      return {
-        ...r,
-        hostelSection: block?.name || r.hostelSection,
-        accommodationType: block?.accommodationType || r.accommodationType,
-        category: categoryStillExists ? r.category : (activeCategories[0]?.name || "")
-      };
-    });
-  }, [blocks, categories]);
+  // ============ JUMP TO BOOKING ============
+  const jumpToBooking = useCallback((booking, subTab) => {
+    setTab("Bookings");
+    setBookingSubTab(subTab);
+    setBookingsShown(9999);
+    setHighlightBookingId(booking._id);
+  }, []);
 
-  const refreshStructure = async () => {
-    try {
-      setStructureMsg("");
-      setStructureError("");
-      
-      const [blocksRes, categoriesRes] = await Promise.all([
-        API.get("/hostel-structure/blocks?activeOnly=false"),
-        API.get("/hostel-structure/categories?activeOnly=false"),
-      ]);
-      
-      const fetchedBlocks = blocksRes.data || [];
-      const fetchedCategories = categoriesRes.data || [];
-      
-      console.log("Fetched blocks:", fetchedBlocks);
-      
-      setBlocks(fetchedBlocks);
-      setCategories(fetchedCategories);
-      
-    } catch (err) {
-      setStructureError(err.response?.data?.message || "Could not load hostel structure.");
-      console.error("Refresh structure error:", err);
-    }
-  };
-
-  const saveBlock = async () => {
-    setStructureError(""); setStructureMsg("");
-    try {
-      if (editingBlock) {
-        const { data } = await API.put(`/hostel-structure/blocks/${editingBlock._id}`, blockForm);
-        setBlocks((prev) => prev.map((b) => b._id === data._id ? data : b));
-        setStructureMsg(`Block "${data.name}" updated.`);
-      } else {
-        const { data } = await API.post("/hostel-structure/blocks", blockForm);
-        setBlocks((prev) => [...prev, data]);
-        setStructureMsg(`Block "${data.name}" created.`);
+  // ============ RECORD CHECKIN ============
+  const recordCheckin = useCallback((id) => {
+    askConfirm("Record check-in now?", async () => {
+      try {
+        const { data } = await API.put(`/bookings/${id}/status`, { status: "checked-in" });
+        setBookings((prev) => prev.map((b) => (b._id === id ? data : b)));
+        setBookingMsg("Check-in recorded successfully.");
+        setBookingError("");
+        await refreshRooms();
+        if (weeklyReport) {
+          API.get("/bookings/report").then(({ data: report }) => setWeeklyReport(report)).catch(() => {});
+        }
+      } catch (err) {
+        setBookingError(err.response?.data?.message || "Unable to record check-in.");
       }
-      setEditingBlock(null);
-      setBlockForm({ name: "", accommodationType: "outside_hostel", usesCategories: true, description: "" });
-    } catch (err) { setStructureError(err.response?.data?.message || "Could not save block."); }
-  };
+    });
+  }, [askConfirm, refreshRooms, weeklyReport]);
 
-  const createBlock = async () => {
+  // ============ RECORD CHECKOUT ============
+  const recordCheckout = useCallback((id) => {
+    askConfirm("Record checkout now?", async () => {
+      try {
+        const { data } = await API.put(`/bookings/${id}/status`, { status: "checked-out" });
+        setBookings((prev) => prev.map((b) => (b._id === id ? data : b)));
+        setBookingMsg("Checkout recorded.");
+        setBookingError("");
+        await refreshRooms();
+        if (weeklyReport) {
+          API.get("/bookings/report").then(({ data: report }) => setWeeklyReport(report)).catch(() => {});
+        }
+      } catch (err) {
+        setBookingError(err.response?.data?.message || "Unable to record checkout.");
+      }
+    });
+  }, [askConfirm, refreshRooms, weeklyReport]);
+
+  // ============ BOOKING ALLOCATION ============
+  const openAllocation = useCallback(async (booking) => {
+    setBookingError("");
+    setBookingMsg("");
+    setAllocatingId(booking._id);
+    setAllocateRoomId([]);
+    try {
+      const { data } = await API.get("/rooms/available-for-booking", {
+        params: { 
+          category: booking.category, 
+          accommodationType: booking.accommodationType || "outside_hostel", 
+          checkIn: booking.checkIn, 
+          checkOut: booking.checkOut 
+        },
+      });
+      setAllocationRooms(data);
+      if (!data.length) setBookingError("No room is available for these booking dates.");
+    } catch (err) {
+      setAllocationRooms([]);
+      setBookingError(err.response?.data?.message || "Unable to load available rooms.");
+    }
+  }, []);
+
+  const allocateRoom = useCallback(async (id) => {
+    if (!allocateRoomId.length) { 
+      setBookingError("Please select the required number of rooms."); 
+      return; 
+    }
+    try {
+      const { data } = await API.put(`/bookings/${id}/allocate`, { roomIds: allocateRoomId });
+      setBookings((prev) => prev.map((b) => (b._id === id ? data : b)));
+      setAllocatingId(null);
+      setAllocateRoomId([]);
+      setBookingMsg("Room allocated successfully.");
+      setBookingError("");
+      await refreshRooms();
+      if (weeklyReport) {
+        API.get("/bookings/report").then(({ data }) => setWeeklyReport(data)).catch(() => {});
+      }
+    } catch (err) {
+      setBookingError(err.response?.data?.message || "Unable to allocate room.");
+    }
+  }, [allocateRoomId, refreshRooms, weeklyReport]);
+
+  // ============ CANCEL BOOKING ============
+  const cancelBooking = useCallback(async (id) => {
+    try {
+      const { data } = await API.post(`/bookings/cancel/${id}`);
+      setBookings((prev) => prev.filter((b) => b._id !== id));
+      if (weeklyReport) {
+        API.get("/bookings/report").then(({ data }) => setWeeklyReport(data)).catch(() => {});
+      }
+      setBookingMsg(data.message);
+      setBookingError("");
+      await refreshRooms();
+    } catch (err) {
+      setBookingError(err.response?.data?.message || "Unable to cancel booking.");
+    }
+  }, [refreshRooms, weeklyReport]);
+
+  // ============ OPEN REALLOCATE ============
+  const openReallocate = useCallback(async (booking) => {
+    setBookingError("");
+    setBookingMsg("");
+    setReallocatingId(booking._id);
+    setReallocateRoomId("");
+    try {
+      const { data } = await API.get("/rooms/available-for-booking", {
+        params: { 
+          category: booking.category, 
+          accommodationType: booking.accommodationType || "outside_hostel", 
+          checkIn: booking.checkIn, 
+          checkOut: booking.checkOut 
+        },
+      });
+      setReallocateRooms(data.filter((r) => String(r._id) !== String(booking.room?._id || booking.room)));
+    } catch (err) {
+      setReallocateRooms([]);
+      setBookingError(err.response?.data?.message || "Unable to load available rooms.");
+    }
+  }, []);
+
+  const confirmReallocate = useCallback(async (bookingId) => {
+    if (!reallocateRoomId) { 
+      setBookingError("Select a room."); 
+      return; 
+    }
+    try {
+      const { data } = await API.put(`/bookings/${bookingId}/reallocate`, { roomId: reallocateRoomId });
+      setBookings((prev) => prev.map((b) => (b._id === bookingId ? data : b)));
+      setReallocatingId(null);
+      setReallocateRoomId("");
+      setReallocateRooms([]);
+      setBookingMsg("Room changed successfully.");
+      await refreshRooms();
+    } catch (err) {
+      setBookingError(err.response?.data?.message || "Could not change room.");
+    }
+  }, [reallocateRoomId, refreshRooms]);
+
+  // ============ CONCERN RESPONSE ============
+  const updateConcernResponse = useCallback(async (id, currentResponse = "") => {
+    setResponseMsg("");
+    setResponseError("");
+    const response = (responseText[id] ?? currentResponse)?.trim();
+    if (!response) {
+      setResponseError("Enter a response before submitting.");
+      return;
+    }
+    try {
+      const { data } = await API.put(`/concerns/${id}/respond`, { response });
+      setConcerns((prev) => prev.map((c) => (c._id === id ? data : c)));
+      setResponseMsg("Concern response saved successfully.");
+      setResponseText((prev) => ({ ...prev, [id]: "" }));
+    } catch (err) {
+      setResponseError(err.response?.data?.message || "Unable to save response.");
+    }
+  }, [responseText]);
+
+  // ============ SET CLIENT ROLE ============
+  const setClientRole = useCallback(async (id, role, name) => {
+    setClientError("");
+    setClientMsg("");
+    try {
+      const { data } = await API.put(`/auth/clients/${id}/role`, { role });
+      setClients((prev) => prev.map((c) => (c._id === id ? { ...c, role } : c)));
+      setClientMsg(data.message);
+    } catch (err) {
+      setClientError(err.response?.data?.message || `Could not update ${name}'s role.`);
+    }
+  }, []);
+
+  // ============ SURVEY FUNCTIONS ============
+  const addSurveyQuestion = useCallback(async () => {
+    if (!newSurveyQuestion.trim()) return;
+    setSurveyQuestionMsg("");
+    try {
+      const { data } = await API.post("/surveys/questions", { text: newSurveyQuestion.trim() });
+      setSurveyQuestions((prev) => [...prev, data]);
+      setNewSurveyQuestion("");
+    } catch (err) {
+      setSurveyQuestionMsg(err.response?.data?.message || "Could not add this question.");
+    }
+  }, [newSurveyQuestion]);
+
+  const toggleSurveyQuestion = useCallback(async (q) => {
+    try {
+      const { data } = await API.put(`/surveys/questions/${q._id}`, { active: !q.active });
+      setSurveyQuestions((prev) => prev.map((x) => (x._id === q._id ? data : x)));
+    } catch (err) {
+      setSurveyQuestionMsg(err.response?.data?.message || "Could not update this question.");
+    }
+  }, []);
+
+  const deleteSurveyQuestion = useCallback(async (id) => {
+    try {
+      await API.delete(`/surveys/questions/${id}`);
+      setSurveyQuestions((prev) => prev.filter((q) => q._id !== id));
+    } catch (err) {
+      setSurveyQuestionMsg(err.response?.data?.message || "Could not delete this question.");
+    }
+  }, []);
+
+  // ============ BLOCK FUNCTIONS ============
+  const createBlock = useCallback(async () => {
     if (!newBlockName.trim()) {
       setBlockMsg("Please enter a block name.");
       return;
@@ -607,9 +648,9 @@ export default function AdminDashboard() {
     } catch (err) {
       setBlockMsg(err.response?.data?.message || "Could not create block.");
     }
-  };
+  }, [newBlockName, newBlockType]);
 
-  const toggleBlockActive = async (block) => {
+  const toggleBlockActive = useCallback(async (block) => {
     try {
       const { data } = await API.put(`/hostel-structure/blocks/${block._id}`, { active: !block.active });
       setBlocks((prev) => prev.map((b) => b._id === data._id ? data : b));
@@ -617,9 +658,9 @@ export default function AdminDashboard() {
     } catch (err) { 
       setStructureError(err.response?.data?.message || "Could not update block."); 
     }
-  };
+  }, []);
 
-  const deleteBlock = async (block) => {
+  const deleteBlock = useCallback(async (block) => {
     askConfirm(`Delete block "${block.name}"? This cannot be undone.`, async () => {
       try {
         await API.delete(`/hostel-structure/blocks/${block._id}`);
@@ -629,9 +670,30 @@ export default function AdminDashboard() {
         setStructureError(err.response?.data?.message || "Could not delete block."); 
       }
     });
-  };
+  }, [askConfirm]);
 
-  const saveSubBlock = async (blockId) => {
+  const saveBlock = useCallback(async () => {
+    setStructureError("");
+    setStructureMsg("");
+    try {
+      if (editingBlock) {
+        const { data } = await API.put(`/hostel-structure/blocks/${editingBlock._id}`, blockForm);
+        setBlocks((prev) => prev.map((b) => b._id === data._id ? data : b));
+        setStructureMsg(`Block "${data.name}" updated.`);
+      } else {
+        const { data } = await API.post("/hostel-structure/blocks", blockForm);
+        setBlocks((prev) => [...prev, data]);
+        setStructureMsg(`Block "${data.name}" created.`);
+      }
+      setEditingBlock(null);
+      setBlockForm({ name: "", accommodationType: "outside_hostel", usesCategories: true, description: "" });
+    } catch (err) { 
+      setStructureError(err.response?.data?.message || "Could not save block."); 
+    }
+  }, [editingBlock, blockForm]);
+
+  // ============ SUB-BLOCK FUNCTIONS ============
+  const saveSubBlock = useCallback(async (blockId) => {
     setStructureError("");
     const name = (subBlockForm[blockId] || "").trim();
     if (!name) return;
@@ -639,11 +701,13 @@ export default function AdminDashboard() {
       const { data } = await API.post(`/hostel-structure/blocks/${blockId}/sub-blocks`, { name });
       setBlocks((prev) => prev.map((b) => b._id === blockId ? data : b));
       setSubBlockForm((prev) => ({ ...prev, [blockId]: "" }));
-    } catch (err) { setStructureError(err.response?.data?.message || "Could not add sub-block."); }
-  };
+    } catch (err) { 
+      setStructureError(err.response?.data?.message || "Could not add sub-block."); 
+    }
+  }, [subBlockForm]);
 
-  const saveManagedSubBlock = async () => {
-    setStructureError(""); 
+  const saveManagedSubBlock = useCallback(async () => {
+    setStructureError("");
     setStructureMsg("");
     
     const parentId = editingSubBlock ? editingSubBlockParent : subBlockParent;
@@ -675,35 +739,40 @@ export default function AdminDashboard() {
       }
       setBlocks((prev) => prev.map((b) => b._id === data._id ? data : b));
       setStructureMsg(`Subblock "${name}" ${editingSubBlock ? "updated" : "created"} successfully.`);
-      setEditingSubBlock(null); 
-      setEditingSubBlockParent(""); 
-      setSubBlockParent(""); 
+      setEditingSubBlock(null);
+      setEditingSubBlockParent("");
+      setSubBlockParent("");
       setSubBlockName("");
-      
       refreshStructure();
     } catch (err) { 
       setStructureError(err.response?.data?.message || "Could not save subblock."); 
     }
-  };
+  }, [editingSubBlock, editingSubBlockParent, subBlockParent, subBlockName, blocks, refreshStructure]);
 
-  const toggleSubBlockActive = async (blockId, subId, current) => {
+  const toggleSubBlockActive = useCallback(async (blockId, subId, current) => {
     try {
       const { data } = await API.put(`/hostel-structure/blocks/${blockId}/sub-blocks/${subId}`, { active: !current });
       setBlocks((prev) => prev.map((b) => b._id === blockId ? data : b));
-    } catch (err) { setStructureError(err.response?.data?.message || "Could not update sub-block."); }
-  };
+    } catch (err) { 
+      setStructureError(err.response?.data?.message || "Could not update sub-block."); 
+    }
+  }, []);
 
-  const deleteSubBlock = async (blockId, subId, name) => {
+  const deleteSubBlock = useCallback(async (blockId, subId, name) => {
     askConfirm(`Delete sub-block "${name}"?`, async () => {
       try {
         const { data } = await API.delete(`/hostel-structure/blocks/${blockId}/sub-blocks/${subId}`);
         setBlocks((prev) => prev.map((b) => b._id === blockId ? data : b));
-      } catch (err) { setStructureError(err.response?.data?.message || "Could not delete sub-block."); }
+      } catch (err) { 
+        setStructureError(err.response?.data?.message || "Could not delete sub-block."); 
+      }
     });
-  };
+  }, [askConfirm]);
 
-  const saveCat = async () => {
-    setStructureError(""); setStructureMsg("");
+  // ============ CATEGORY FUNCTIONS ============
+  const saveCat = useCallback(async () => {
+    setStructureError("");
+    setStructureMsg("");
     try {
       if (editingCat) {
         const { data } = await API.put(`/hostel-structure/categories/${editingCat._id}`, catForm);
@@ -716,28 +785,127 @@ export default function AdminDashboard() {
       }
       setEditingCat(null);
       setCatForm({ name: "", price: "", description: "", capacity: 2 });
-    } catch (err) { setStructureError(err.response?.data?.message || "Could not save category."); }
-  };
+    } catch (err) { 
+      setStructureError(err.response?.data?.message || "Could not save category."); 
+    }
+  }, [editingCat, catForm]);
 
-  const toggleCatActive = async (cat) => {
+  const toggleCatActive = useCallback(async (cat) => {
     try {
       const { data } = await API.put(`/hostel-structure/categories/${cat._id}`, { active: !cat.active });
       setCategories((prev) => prev.map((c) => c._id === data._id ? data : c));
-    } catch (err) { setStructureError(err.response?.data?.message || "Could not update category."); }
-  };
+    } catch (err) { 
+      setStructureError(err.response?.data?.message || "Could not update category."); 
+    }
+  }, []);
 
-  const deleteCat = async (cat) => {
+  const deleteCat = useCallback(async (cat) => {
     askConfirm(`Delete category "${cat.name}"? This cannot be undone.`, async () => {
       try {
         await API.delete(`/hostel-structure/categories/${cat._id}`);
         setCategories((prev) => prev.filter((c) => c._id !== cat._id));
         setStructureMsg(`Category "${cat.name}" deleted.`);
-      } catch (err) { setStructureError(err.response?.data?.message || "Could not delete category."); }
+      } catch (err) { 
+        setStructureError(err.response?.data?.message || "Could not delete category."); 
+      }
     });
-  };
+  }, [askConfirm]);
 
-  // Room Edit
-  const openEditRoom = (room) => {
+  // ============ SAVE EDIT ROOM ============
+  const saveEditRoom = useCallback(async () => {
+    setEditRoomError("");
+    setEditRoomSaving(true);
+    try {
+      const { data } = await API.put(`/rooms/${editingRoom._id}`, editRoomForm);
+      setRooms((prev) => prev.map((r) => r._id === data._id ? data : r));
+      setMsg(`Room ${data.roomNumber} updated.`);
+      setEditingRoom(null);
+    } catch (err) {
+      setEditRoomError(err.response?.data?.message || "Could not save room.");
+    } finally { 
+      setEditRoomSaving(false); 
+    }
+  }, [editingRoom, editRoomForm]);
+
+  // ============ RECORD OCCUPANT STATUS ============
+  const recordOccupantStatus = useCallback((bookingId, occupantId, status, name) => {
+    const action = status === "checked-in" ? "check in" : "check out";
+    askConfirm(
+      `${status === "checked-in" ? "Check in" : "Record"} ${name || "this person"}${status === "checked-out" ? " as checked out?" : "?"}`,
+      async () => {
+        try {
+          const { data } = await API.put(`/bookings/${bookingId}/occupants/${occupantId}/status`, { status });
+          setBookings((prev) => prev.map((b) => (b._id === bookingId ? data.booking : b)));
+          setBookingMsg(`${name || "Occupant"} ${status === "checked-in" ? "checked in" : "checked out"}.`);
+          setBookingError("");
+          await refreshRooms();
+        } catch (err) { 
+          setBookingError(err.response?.data?.message || `Unable to ${action} occupant.`); 
+        }
+      }
+    );
+  }, [askConfirm, refreshRooms]);
+
+  // ============ DELETE BOOKING RECORD ============
+  const deleteBookingRecordConfirmed = useCallback(async (id) => {
+    try {
+      await API.delete(`/bookings/${id}/history`);
+      setBookings((prev) => prev.filter((b) => b._id !== id));
+      setBookingMsg("Booking record deleted.");
+      setBookingError("");
+      await refreshRooms();
+      if (weeklyReport) {
+        API.get("/bookings/report").then(({ data }) => setWeeklyReport(data)).catch(() => {});
+      }
+    } catch (err) {
+      setBookingError(err.response?.data?.message || "Unable to delete this booking.");
+    }
+  }, [refreshRooms, weeklyReport]);
+
+  const deleteBookingRecord = useCallback((id) => {
+    askConfirm("Permanently delete this booking record? This can't be undone.", () => deleteBookingRecordConfirmed(id));
+  }, [askConfirm, deleteBookingRecordConfirmed]);
+
+  // ============ IMAGE HANDLING ============
+  const readRoomImage = useCallback((file, callback) => {
+    if (!file) return;
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
+      setAddRoomError("Please choose a JPG, PNG, or WebP image.");
+      return;
+    }
+    if (file.size > 3 * 1024 * 1024) {
+      setAddRoomError("Image must be 3 MB or smaller.");
+      return;
+    }
+    const reader = new FileReader();
+    reader.onload = () => callback(String(reader.result), file.name);
+    reader.onerror = () => setAddRoomError("Unable to read the selected image.");
+    reader.readAsDataURL(file);
+  }, []);
+
+  const MAX_ROOM_PHOTOS = 5;
+  
+  const addRoomPhotos = useCallback((files) => {
+    const list = Array.from(files || []);
+    if (!list.length) return;
+    if (newRoom.images.length + list.length > MAX_ROOM_PHOTOS) {
+      setAddRoomError(`You can upload up to ${MAX_ROOM_PHOTOS} photos per room.`);
+      return;
+    }
+    setAddRoomError("");
+    list.forEach((file) => {
+      readRoomImage(file, (imageData) => {
+        setNewRoom((r) => (r.images.length >= MAX_ROOM_PHOTOS ? r : { ...r, images: [...r.images, imageData] }));
+      });
+    });
+  }, [newRoom.images, readRoomImage]);
+
+  const removeRoomPhoto = useCallback((index) => {
+    setNewRoom((r) => ({ ...r, images: r.images.filter((_, i) => i !== index) }));
+  }, []);
+
+  // ============ OPEN EDIT ROOM ============
+  const openEditRoom = useCallback((room) => {
     setEditingRoom(room);
     setEditRoomForm({
       roomNumber: room.roomNumber,
@@ -750,47 +918,87 @@ export default function AdminDashboard() {
       active: room.active !== false,
     });
     setEditRoomError("");
-  };
+  }, []);
 
-  const saveEditRoom = async () => {
-    setEditRoomError(""); setEditRoomSaving(true);
-    try {
-      const { data } = await API.put(`/rooms/${editingRoom._id}`, editRoomForm);
-      setRooms((prev) => prev.map((r) => r._id === data._id ? data : r));
-      setMsg(`Room ${data.roomNumber} updated.`);
-      setEditingRoom(null);
-    } catch (err) {
-      setEditRoomError(err.response?.data?.message || "Could not save room.");
-    } finally { setEditRoomSaving(false); }
-  };
+  // ============ EFFECTS ============
+  useEffect(() => {
+    const fetchData = async () => {
+      try {
+        const [bookingsRes, roomsRes, clientsRes, concernsRes, surveysRes, blocksRes, categoriesRes, questionsRes] = await Promise.all([
+          API.get("/bookings"),
+          API.get("/rooms"),
+          API.get("/auth/clients"),
+          API.get("/concerns"),
+          API.get("/surveys"),
+          API.get("/hostel-structure/blocks?activeOnly=false"),
+          API.get("/hostel-structure/categories?activeOnly=false"),
+          API.get("/surveys/questions/all"),
+        ]);
+        
+        setBookings(bookingsRes.data);
+        setRooms(roomsRes.data);
+        setClients(clientsRes.data);
+        setConcerns(concernsRes.data.concerns || concernsRes.data);
+        setSurveys(surveysRes.data);
+        setBlocks(blocksRes.data);
+        setCategories(categoriesRes.data);
+        setSurveyQuestions(questionsRes.data);
+        
+        // Also fetch weekly report and blocks list
+        const [reportRes, blocksListRes] = await Promise.all([
+          API.get("/bookings/report"),
+          API.get("/rooms/blocks")
+        ]);
+        setWeeklyReport(reportRes.data);
+        setKnownBlocks(blocksListRes.data);
+        
+      } catch (err) {
+        console.error("Error loading data:", err);
+      }
+    };
+    
+    fetchData();
+  }, []);
 
-  // Reallocate Room
-  const openReallocate = async (booking) => {
-    setBookingError(""); setBookingMsg("");
-    setReallocatingId(booking._id);
-    setReallocateRoomId("");
-    try {
-      const { data } = await API.get("/rooms/available-for-booking", {
-        params: { category: booking.category, accommodationType: booking.accommodationType || "outside_hostel", checkIn: booking.checkIn, checkOut: booking.checkOut },
-      });
-      setReallocateRooms(data.filter((r) => String(r._id) !== String(booking.room?._id || booking.room)));
-    } catch (err) {
-      setReallocateRooms([]);
-      setBookingError(err.response?.data?.message || "Unable to load available rooms.");
+  useEffect(() => {
+    setMonthlyReportError("");
+    API.get("/bookings/monthly-report", { params: { month: monthlyReportMonth } })
+      .then(({ data }) => setMonthlyReport(data))
+      .catch((err) => setMonthlyReportError(err.response?.data?.message || "Unable to load monthly performance."));
+  }, [monthlyReportMonth]);
+
+  useEffect(() => {
+    if (!highlightBookingId || tab !== "Bookings") return;
+    const el = document.getElementById(`booking-row-${highlightBookingId}`);
+    if (el) {
+      el.scrollIntoView({ behavior: "smooth", block: "center" });
+      el.style.transition = "box-shadow 0.3s";
+      el.style.boxShadow = "0 0 0 3px #c9960d";
+      const t = setTimeout(() => { 
+        el.style.boxShadow = "none"; 
+        setHighlightBookingId(null); 
+      }, 2500);
+      return () => clearTimeout(t);
     }
-  };
+  }, [highlightBookingId, tab, bookingSubTab]);
 
-  const confirmReallocate = async (bookingId) => {
-    if (!reallocateRoomId) { setBookingError("Select a room."); return; }
-    try {
-      const { data } = await API.put(`/bookings/${bookingId}/reallocate`, { roomId: reallocateRoomId });
-      setBookings((prev) => prev.map((b) => b._id === bookingId ? data : b));
-      setReallocatingId(null); setReallocateRoomId(""); setReallocateRooms([]);
-      setBookingMsg("Room changed successfully.");
-      await refreshRooms();
-    } catch (err) { setBookingError(err.response?.data?.message || "Could not change room."); }
-  };
+  useEffect(() => {
+    if (!blocks.length) return;
+    setNewRoom((r) => {
+      const currentBlock = blocks.find((b) => b.name === r.hostelSection);
+      const block = currentBlock || blocks.find((b) => b.active !== false);
+      const activeCategories = categories.filter((c) => c.active);
+      const categoryStillExists = activeCategories.some((c) => c.name === r.category);
+      return {
+        ...r,
+        hostelSection: block?.name || r.hostelSection,
+        accommodationType: block?.accommodationType || r.accommodationType,
+        category: categoryStillExists ? r.category : (activeCategories[0]?.name || "")
+      };
+    });
+  }, [blocks, categories]);
 
+  // ============ CALCULATE STATS ============
   const stats = {
     totalBookings: bookings.length,
     pending: bookings.filter((b) => b.status === "pending").length,
@@ -812,6 +1020,7 @@ export default function AdminDashboard() {
     averageRating: surveys.length > 0 ? (surveys.reduce((sum, s) => sum + s.rating, 0) / surveys.length).toFixed(1) : "N/A",
   };
 
+  // ============ FILTERED DATA ============
   const filteredBookings = bookings.filter((b) =>
     b.client?.name?.toLowerCase().includes(search.toLowerCase()) ||
     b.client?.email?.toLowerCase().includes(search.toLowerCase()) ||
@@ -844,6 +1053,47 @@ export default function AdminDashboard() {
     s.comments?.toLowerCase().includes(search.toLowerCase())
   );
 
+  // ============ STYLES ============
+  const styles = {
+    statsGrid: { 
+      display: "grid", 
+      gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", 
+      gap: "16px", 
+      marginBottom: "32px" 
+    },
+    statCard: { 
+      textAlign: "center", 
+      padding: "20px", 
+      background: "#fffdf9", 
+      border: "1px solid #f0ede6" 
+    },
+    recentSection: { marginTop: "8px" },
+    table: { 
+      width: "100%", 
+      borderCollapse: "collapse", 
+      background: "#fffdf9", 
+      borderRadius: "10px", 
+      overflow: "hidden", 
+      fontSize: "14px", 
+      border: "1px solid #f0ede6" 
+    },
+    th: { 
+      background: "#1a1a2e", 
+      color: "#f0c040", 
+      padding: "12px 16px", 
+      textAlign: "left", 
+      fontSize: "13px", 
+      whiteSpace: "nowrap" 
+    },
+    td: { 
+      padding: "12px 16px", 
+      borderBottom: "1px solid #f5f0e8", 
+      verticalAlign: "middle", 
+      color: "#333" 
+    },
+  };
+
+  // ============ RENDER ============
   return (
     <div className="container" style={{ padding: "40px 20px" }}>
       <div style={{ marginBottom: "24px" }}>
@@ -852,15 +1102,49 @@ export default function AdminDashboard() {
       </div>
 
       {stats.pending > 0 && (
-        <div style={{ marginBottom: "20px", padding: "14px 18px", borderRadius: "10px", background: "#fff1f0", border: "2px solid #ff4d4f", color: "#a8071a", fontSize: "14px", fontWeight: "600", display: "flex", alignItems: "center", gap: "10px" }}>
+        <div style={{ 
+          marginBottom: "20px", 
+          padding: "14px 18px", 
+          borderRadius: "10px", 
+          background: "#fff1f0", 
+          border: "2px solid #ff4d4f", 
+          color: "#a8071a", 
+          fontSize: "14px", 
+          fontWeight: "600", 
+          display: "flex", 
+          alignItems: "center", 
+          gap: "10px" 
+        }}>
           <span style={{ fontSize: "20px", animation: "pulse 1s infinite" }}>🔔</span>
-          <span>{stats.pending} new booking{stats.pending > 1 ? "s" : ""} pending room allocation — go to <button onClick={() => { setTab("Bookings"); setBookingSubTab("Waiting List"); }} style={{ background: "none", border: "none", color: "#a8071a", fontWeight: "700", textDecoration: "underline", cursor: "pointer", fontSize: "14px", padding: 0 }}>Bookings</button> to allocate.</span>
+          <span>
+            {stats.pending} new booking{stats.pending > 1 ? "s" : ""} pending room allocation — go to 
+            <button 
+              onClick={() => { setTab("Bookings"); setBookingSubTab("Waiting List"); }} 
+              style={{ 
+                background: "none", 
+                border: "none", 
+                color: "#a8071a", 
+                fontWeight: "700", 
+                textDecoration: "underline", 
+                cursor: "pointer", 
+                fontSize: "14px", 
+                padding: 0 
+              }}
+            >
+              Bookings
+            </button> 
+            to allocate.
+          </span>
         </div>
       )}
 
       <div style={{ display: "flex", gap: "10px", marginBottom: "28px", flexWrap: "wrap" }}>
         {TABS.map((t) => (
-          <button key={t} className={`btn ${tab === t ? "btn-primary" : "btn-outline"}`} onClick={() => { setTab(t); setSearch(""); }}>
+          <button 
+            key={t} 
+            className={`btn ${tab === t ? "btn-primary" : "btn-outline"}`} 
+            onClick={() => { setTab(t); setSearch(""); }}
+          >
             {t === "Overview" ? "📊 Overview"
               : t === "Reports" ? "📈 Reports"
               : t === "Bookings" ? "📋 Bookings"
@@ -872,7 +1156,7 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      {/* OVERVIEW TAB */}
+      {/* ===== OVERVIEW TAB ===== */}
       {tab === "Overview" && (
         <>
           {(() => {
@@ -888,7 +1172,10 @@ export default function AdminDashboard() {
                     <h4 style={{ margin: "0 0 10px", color: "#7c5a10" }}>⏰ Guests to Check In Today ({dueCheckIns.length})</h4>
                     {dueCheckIns.map((b) => (
                       <div key={b._id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: "1px solid #fbd38d33", fontSize: "13px" }}>
-                        <span><strong>{b.client?.name}</strong> — {b.room?.roomNumber ? `Room ${b.room.roomNumber}` : `${b.category} (not yet allocated)`}{isSameDay(b.checkIn, today) ? "" : " · overdue"}</span>
+                        <span>
+                          <strong>{b.client?.name}</strong> — {b.room?.roomNumber ? `Room ${b.room.roomNumber}` : `${b.category} (not yet allocated)`}
+                          {isSameDay(b.checkIn, today) ? "" : " · overdue"}
+                        </span>
                         {b.room ? (
                           <button className="btn btn-primary" style={{ padding: "5px 10px", fontSize: "12px" }} onClick={() => { jumpToBooking(b, "Waiting List"); recordCheckin(b._id); }}>Check In</button>
                         ) : (
@@ -903,7 +1190,10 @@ export default function AdminDashboard() {
                     <h4 style={{ margin: "0 0 10px", color: "#2a69ac" }}>🚪 Guests to Check Out Today ({dueCheckOuts.length})</h4>
                     {dueCheckOuts.map((b) => (
                       <div key={b._id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "8px 0", borderTop: "1px solid #90cdf433", fontSize: "13px" }}>
-                        <span><strong>{b.client?.name}</strong> — Room {b.room?.roomNumber}{isSameDay(b.checkOut, today) ? "" : " · overdue"}</span>
+                        <span>
+                          <strong>{b.client?.name}</strong> — Room {b.room?.roomNumber}
+                          {isSameDay(b.checkOut, today) ? "" : " · overdue"}
+                        </span>
                         <button className="btn btn-primary" style={{ padding: "5px 10px", fontSize: "12px" }} onClick={() => { jumpToBooking(b, "Checked In"); recordCheckout(b._id); }}>Check Out</button>
                       </div>
                     ))}
@@ -941,18 +1231,36 @@ export default function AdminDashboard() {
             <div style={{ overflowX: "auto" }}>
               <table style={styles.table}>
                 <thead>
-                  <tr>{["Client", "Room", "Check-in", "Check-out", "Total", "Status"].map((h) => <th key={h} style={styles.th}>{h}</th>)}</tr>
+                  <tr>
+                    {["Client", "Room", "Check-in", "Check-out", "Total", "Status"].map((h) => (
+                      <th key={h} style={styles.th}>{h}</th>
+                    ))}
+                  </tr>
                 </thead>
                 <tbody>
                   {bookings.slice(0, 5).map((b) => (
                     <tr key={b._id}>
-                      <td style={styles.td}>{b.client?.name}<br /><small style={{ color: "#888" }}>{b.client?.email}</small></td>
-                      <td style={styles.td}>{b.room?.roomNumber ? `Room ${b.room.roomNumber}` : <span style={{ color: "#888" }}>{b.category} — Pending</span>}<br /><small style={{ color: "#b8860b" }}>{b.room?.category || b.category}</small></td>
+                      <td style={styles.td}>
+                        {b.client?.name}<br />
+                        <small style={{ color: "#888" }}>{b.client?.email}</small>
+                      </td>
+                      <td style={styles.td}>
+                        {b.room?.roomNumber ? `Room ${b.room.roomNumber}` : <span style={{ color: "#888" }}>{b.category} — Pending</span>}
+                        <br />
+                        <small style={{ color: "#b8860b" }}>{b.room?.category || b.category}</small>
+                      </td>
                       <td style={styles.td}>{new Date(b.checkIn).toDateString()}</td>
                       <td style={styles.td}>{new Date(b.checkOut).toDateString()}</td>
                       <td style={{ ...styles.td, fontWeight: "600", color: "#b8860b" }}>{fmt(b.totalPrice)}</td>
                       <td style={styles.td}>
-                        <span style={{ background: STATUS_COLORS[b.status]?.bg, color: STATUS_COLORS[b.status]?.color, padding: "4px 10px", borderRadius: "20px", fontSize: "12px", fontWeight: "600" }}>
+                        <span style={{ 
+                          background: STATUS_COLORS[b.status]?.bg, 
+                          color: STATUS_COLORS[b.status]?.color, 
+                          padding: "4px 10px", 
+                          borderRadius: "20px", 
+                          fontSize: "12px", 
+                          fontWeight: "600" 
+                        }}>
                           {b.status}
                         </span>
                       </td>
@@ -965,17 +1273,24 @@ export default function AdminDashboard() {
         </>
       )}
 
-      {/* REPORTS TAB */}
+      {/* ===== REPORTS TAB ===== */}
       {tab === "Reports" && (
         <>
           <div style={{ marginBottom: "32px" }}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", flexWrap: "wrap", gap: "12px", marginBottom: "12px" }}>
               <h3 style={{ fontSize: "20px", margin: 0 }}>📊 Monthly Performance Dashboard</h3>
-              <input type="month" value={monthlyReportMonth} onChange={(e) => setMonthlyReportMonth(e.target.value)} style={{ marginBottom: 0 }} />
+              <input 
+                type="month" 
+                value={monthlyReportMonth} 
+                onChange={(e) => setMonthlyReportMonth(e.target.value)} 
+                style={{ marginBottom: 0 }} 
+              />
             </div>
             {monthlyReportError && <p style={{ color: "#b91c1c", marginBottom: "12px" }}>{monthlyReportError}</p>}
             {!monthlyReport ? (
-              <div style={{ textAlign: "center", padding: "30px" }}><p>Loading monthly performance...</p></div>
+              <div style={{ textAlign: "center", padding: "30px" }}>
+                <p>Loading monthly performance...</p>
+              </div>
             ) : (
               <>
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "16px", marginBottom: "20px" }}>
@@ -1000,23 +1315,31 @@ export default function AdminDashboard() {
                 <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(260px, 1fr))", gap: "16px" }}>
                   <div className="card" style={{ padding: "16px" }}>
                     <h4 style={{ margin: "0 0 10px", fontSize: "15px" }}>Revenue by Category</h4>
-                    {Object.entries(monthlyReport.revenueByCategory || {}).length ? Object.entries(monthlyReport.revenueByCategory).map(([cat, rev]) => (
-                      <div key={cat} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid #eee", fontSize: "13px" }}>
-                        <span>{cat}</span><strong style={{ color: "#b8860b" }}>{fmt(rev)}</strong>
-                      </div>
-                    )) : <p style={{ color: "#999", fontSize: "13px" }}>No revenue this month yet.</p>}
+                    {Object.entries(monthlyReport.revenueByCategory || {}).length ? (
+                      Object.entries(monthlyReport.revenueByCategory).map(([cat, rev]) => (
+                        <div key={cat} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid #eee", fontSize: "13px" }}>
+                          <span>{cat}</span>
+                          <strong style={{ color: "#b8860b" }}>{fmt(rev)}</strong>
+                        </div>
+                      ))
+                    ) : (
+                      <p style={{ color: "#999", fontSize: "13px" }}>No revenue this month yet.</p>
+                    )}
                   </div>
                   <div className="card" style={{ padding: "16px" }}>
                     <h4 style={{ margin: "0 0 10px", fontSize: "15px" }}>Revenue by Location</h4>
                     {[["ilpd_building", "ILPD Building"], ["outside_hostel", "Hostel Block"]].map(([key, label]) => (
                       <div key={key} style={{ display: "flex", justifyContent: "space-between", padding: "6px 0", borderTop: "1px solid #eee", fontSize: "13px" }}>
-                        <span>{label}</span><strong style={{ color: "#b8860b" }}>{fmt(monthlyReport.revenueByLocation?.[key] || 0)}</strong>
+                        <span>{label}</span>
+                        <strong style={{ color: "#b8860b" }}>{fmt(monthlyReport.revenueByLocation?.[key] || 0)}</strong>
                       </div>
                     ))}
                   </div>
                   <div className="card" style={{ padding: "16px" }}>
                     <h4 style={{ margin: "0 0 10px", fontSize: "15px" }}>Room Occupancy</h4>
-                    <p style={{ fontSize: "13px", color: "#555" }}>{monthlyReport.occupiedRooms} of {monthlyReport.totalRooms} rooms had a booking overlapping this month.</p>
+                    <p style={{ fontSize: "13px", color: "#555" }}>
+                      {monthlyReport.occupiedRooms} of {monthlyReport.totalRooms} rooms had a booking overlapping this month.
+                    </p>
                   </div>
                 </div>
               </>
@@ -1027,9 +1350,11 @@ export default function AdminDashboard() {
             <h3 style={{ fontSize: "20px", marginBottom: "12px" }}>Weekly Booking Report</h3>
             {reportError && <p style={{ color: "#b91c1c", marginBottom: "12px" }}>{reportError}</p>}
             {!weeklyReport ? (
-              <div style={styles.center}><p>Loading weekly report...</p></div>
+              <div style={{ textAlign: "center", padding: "30px" }}>
+                <p>Loading weekly report...</p>
+              </div>
             ) : (
-              <div style={{ display: "grid", gap: "16px", marginBottom: "24px" }}>
+              <div style={{ display: "grid", gridTemplateColumns: "repeat(auto-fit, minmax(160px, 1fr))", gap: "16px", marginBottom: "24px" }}>
                 {[
                   ["Total Bookings", weeklyReport.totalBookings, "#1a1a2e"],
                   ["Total Revenue", fmt(weeklyReport.totalRevenue), "#b8860b"],
@@ -1051,25 +1376,45 @@ export default function AdminDashboard() {
             <div style={{ overflowX: "auto" }}>
               <table style={styles.table}>
                 <thead>
-                  <tr>{["Client", "Room", "Check-in", "Check-out", "Total", "Status"].map((h) => <th key={h} style={styles.th}>{h}</th>)}</tr>
+                  <tr>
+                    {["Client", "Room", "Check-in", "Check-out", "Total", "Status"].map((h) => (
+                      <th key={h} style={styles.th}>{h}</th>
+                    ))}
+                  </tr>
                 </thead>
                 <tbody>
                   {(weeklyReport?.bookings || []).map((b) => (
                     <tr key={b._id}>
-                      <td style={styles.td}>{b.client?.name}<br /><small style={{ color: "#888" }}>{b.client?.email}</small></td>
-                      <td style={styles.td}>Room {b.room?.roomNumber}{b.room?.hostelSection ? ` — ${b.room.hostelSection}` : ""}</td>
+                      <td style={styles.td}>
+                        {b.client?.name}<br />
+                        <small style={{ color: "#888" }}>{b.client?.email}</small>
+                      </td>
+                      <td style={styles.td}>
+                        Room {b.room?.roomNumber}{b.room?.hostelSection ? ` — ${b.room.hostelSection}` : ""}
+                      </td>
                       <td style={styles.td}>{new Date(b.checkIn).toDateString()}</td>
                       <td style={styles.td}>{new Date(b.checkOut).toDateString()}</td>
                       <td style={{ ...styles.td, fontWeight: "700", color: "#b8860b" }}>{fmt(b.totalPrice)}</td>
                       <td style={styles.td}>
-                        <span style={{ background: STATUS_COLORS[b.status]?.bg, color: STATUS_COLORS[b.status]?.color, padding: "4px 10px", borderRadius: "20px", fontSize: "12px", fontWeight: "600" }}>
+                        <span style={{ 
+                          background: STATUS_COLORS[b.status]?.bg, 
+                          color: STATUS_COLORS[b.status]?.color, 
+                          padding: "4px 10px", 
+                          borderRadius: "20px", 
+                          fontSize: "12px", 
+                          fontWeight: "600" 
+                        }}>
                           {b.status}
                         </span>
                       </td>
                     </tr>
                   ))}
                   {weeklyReport?.bookings?.length === 0 && (
-                    <tr><td colSpan="6" style={{ ...styles.td, textAlign: "center", color: "#888", padding: "40px" }}>No bookings this week.</td></tr>
+                    <tr>
+                      <td colSpan="6" style={{ ...styles.td, textAlign: "center", color: "#888", padding: "40px" }}>
+                        No bookings this week.
+                      </td>
+                    </tr>
                   )}
                 </tbody>
               </table>
@@ -1078,12 +1423,19 @@ export default function AdminDashboard() {
         </>
       )}
 
-      {/* BOOKINGS TAB */}
+      {/* ===== BOOKINGS TAB ===== */}
       {tab === "Bookings" && (
         <>
           <div style={{ marginBottom: "16px", display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
-            <input placeholder="🔍 Search by client name, email or room number..." value={search} onChange={(e) => { setSearch(e.target.value); setBookingsShown(25); }} style={{ maxWidth: "400px", marginBottom: 0 }} />
-            <span style={{ color: "#888", fontSize: "13px" }}>{filteredBookings.length} booking{filteredBookings.length !== 1 ? "s" : ""} found</span>
+            <input 
+              placeholder="🔍 Search by client name, email or room number..." 
+              value={search} 
+              onChange={(e) => { setSearch(e.target.value); setBookingsShown(25); }} 
+              style={{ maxWidth: "400px", marginBottom: 0 }} 
+            />
+            <span style={{ color: "#888", fontSize: "13px" }}>
+              {filteredBookings.length} booking{filteredBookings.length !== 1 ? "s" : ""} found
+            </span>
             {bookingMsg && <span className="success">✅ {bookingMsg}</span>}
             {bookingError && <span className="error">⚠️ {bookingError}</span>}
           </div>
@@ -1112,27 +1464,67 @@ export default function AdminDashboard() {
             };
 
             const renderRow = (b) => {
-              const duration = b.billingPeriod === "night" ? Math.max(1, Math.ceil((new Date(b.checkOut) - new Date(b.checkIn)) / 86400000)) : Number(b.billingMonths || 1);
+              const duration = b.billingPeriod === "night" 
+                ? Math.max(1, Math.ceil((new Date(b.checkOut) - new Date(b.checkIn)) / 86400000)) 
+                : Number(b.billingMonths || 1);
               const durationLabel = b.billingPeriod === "night" ? "night" : "month";
+              
               return (
                 <div key={b._id} id={`booking-row-${b._id}`} className="card" style={{ padding: "16px 18px", marginBottom: "12px" }}>
                   <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", flexWrap: "wrap", gap: "10px", marginBottom: "10px" }}>
                     <div>
                       <strong style={{ fontSize: "15px" }}>{b.client?.name}</strong>
-                      <div style={{ color: "#888", fontSize: "12px" }}>{b.client?.email} · {b.client?.phone || "N/A"}</div>
+                      <div style={{ color: "#888", fontSize: "12px" }}>
+                        {b.client?.email} · {b.client?.phone || "N/A"}
+                      </div>
                     </div>
                     <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
-                      <span style={{ background: STATUS_COLORS[b.status]?.bg, color: STATUS_COLORS[b.status]?.color, padding: "4px 10px", borderRadius: "20px", fontSize: "12px", fontWeight: "600" }}>{b.status}</span>
-                      <span style={{ background: b.paymentStatus === "paid" ? "#c6f6d5" : "#fed7d7", color: b.paymentStatus === "paid" ? "#276749" : "#9b2c2c", padding: "4px 10px", borderRadius: "20px", fontSize: "12px", fontWeight: "600" }}>{b.paymentStatus}</span>
+                      <span style={{ 
+                        background: STATUS_COLORS[b.status]?.bg, 
+                        color: STATUS_COLORS[b.status]?.color, 
+                        padding: "4px 10px", 
+                        borderRadius: "20px", 
+                        fontSize: "12px", 
+                        fontWeight: "600" 
+                      }}>
+                        {b.status}
+                      </span>
+                      <span style={{ 
+                        background: b.paymentStatus === "paid" ? "#c6f6d5" : "#fed7d7", 
+                        color: b.paymentStatus === "paid" ? "#276749" : "#9b2c2c", 
+                        padding: "4px 10px", 
+                        borderRadius: "20px", 
+                        fontSize: "12px", 
+                        fontWeight: "600" 
+                      }}>
+                        {b.paymentStatus}
+                      </span>
                     </div>
                   </div>
 
-                  <div style={{ display: "flex", flexWrap: "wrap", gap: "16px", fontSize: "13px", color: "#444", marginBottom: "12px", paddingBottom: "12px", borderBottom: "1px solid #f0ede6" }}>
-                    <span>🏠 {b.room?.roomNumber ? <strong>Room {b.room.roomNumber}</strong> : <span style={{ color: "#888" }}>Not yet allocated</span>}</span>
-                    <span>📍 {b.room?.accommodationType === "ilpd_building" || b.accommodationType === "ilpd_building" ? "ILPD Building" : "Hostel Block"}</span>
+                  <div style={{ 
+                    display: "flex", 
+                    flexWrap: "wrap", 
+                    gap: "16px", 
+                    fontSize: "13px", 
+                    color: "#444", 
+                    marginBottom: "12px", 
+                    paddingBottom: "12px", 
+                    borderBottom: "1px solid #f0ede6" 
+                  }}>
+                    <span>
+                      🏠 {b.room?.roomNumber ? <strong>Room {b.room.roomNumber}</strong> : <span style={{ color: "#888" }}>Not yet allocated</span>}
+                    </span>
+                    <span>
+                      📍 {b.room?.accommodationType === "ilpd_building" || b.accommodationType === "ilpd_building" ? "ILPD Building" : "Hostel Block"}
+                    </span>
                     <span>🏷️ {b.room?.category || b.category || "—"}</span>
-                    <span>👥 {b.numberOfOccupants || b.occupants?.length || 1} occupant{(b.numberOfOccupants || 1) > 1 ? "s" : ""}</span>
-                    <span>📅 {new Date(b.checkIn).toLocaleDateString()} → {new Date(b.checkOut).toLocaleDateString()} ({duration} {durationLabel}{duration > 1 ? "s" : ""})</span>
+                    <span>
+                      👥 {b.numberOfOccupants || b.occupants?.length || 1} occupant{(b.numberOfOccupants || 1) > 1 ? "s" : ""}
+                    </span>
+                    <span>
+                      📅 {new Date(b.checkIn).toLocaleDateString()} → {new Date(b.checkOut).toLocaleDateString()} ({duration} {durationLabel}{duration > 1 ? "s" : ""})
+                    </span>
                     <span style={{ fontWeight: "700", color: "#b8860b" }}>💰 {fmt(b.totalPrice)}</span>
                   </div>
 
@@ -1141,68 +1533,173 @@ export default function AdminDashboard() {
                       allocatingId === b._id ? (
                         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", alignItems: "center" }}>
                           <div>
-                            <div style={{ fontSize: "11px", fontWeight: "700", marginBottom: "4px" }}>Select {b.numberOfOccupants || b.occupants?.length || 1} room(s)</div>
-                            <select multiple value={allocateRoomId} onChange={(e) => setAllocateRoomId(Array.from(e.target.selectedOptions, (o) => o.value))} style={{ width: "220px", minHeight: "72px", marginBottom: 0, fontSize: "12px" }}>
-                              {allocationRooms.map((r) => <option key={r._id} value={r._id}>Room {r.roomNumber}{r.hostelSection ? ` — ${r.hostelSection}` : ""}</option>)}
+                            <div style={{ fontSize: "11px", fontWeight: "700", marginBottom: "4px" }}>
+                              Select {b.numberOfOccupants || b.occupants?.length || 1} room(s)
+                            </div>
+                            <select 
+                              multiple 
+                              value={allocateRoomId} 
+                              onChange={(e) => setAllocateRoomId(Array.from(e.target.selectedOptions, (o) => o.value))} 
+                              style={{ width: "220px", minHeight: "72px", marginBottom: 0, fontSize: "12px" }}
+                            >
+                              {allocationRooms.map((r) => (
+                                <option key={r._id} value={r._id}>
+                                  Room {r.roomNumber}{r.hostelSection ? ` — ${r.hostelSection}` : ""}
+                                </option>
+                              ))}
                             </select>
                           </div>
-                          <button className="btn btn-primary" style={{ minWidth: "90px" }} onClick={() => allocateRoom(b._id)}>Allocate</button>
-                          <button className="btn btn-secondary" style={{ minWidth: "70px" }} onClick={() => { setAllocatingId(null); setAllocateRoomId([]); setAllocationRooms([]); }}>Cancel</button>
+                          <button className="btn btn-primary" style={{ minWidth: "90px" }} onClick={() => allocateRoom(b._id)}>
+                            Allocate
+                          </button>
+                          <button 
+                            className="btn btn-secondary" 
+                            style={{ minWidth: "70px" }} 
+                            onClick={() => { setAllocatingId(null); setAllocateRoomId([]); setAllocationRooms([]); }}
+                          >
+                            Cancel
+                          </button>
                         </div>
                       ) : (
                         <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                          <button className="btn btn-primary" style={{ minWidth: "100px" }} onClick={() => openAllocation(b)}>Allocate Room</button>
-                          <button className="btn btn-danger" style={{ minWidth: "80px" }} onClick={() => cancelBooking(b._id)}>Cancel</button>
+                          <button className="btn btn-primary" style={{ minWidth: "100px" }} onClick={() => openAllocation(b)}>
+                            Allocate Room
+                          </button>
+                          <button className="btn btn-danger" style={{ minWidth: "80px" }} onClick={() => cancelBooking(b._id)}>
+                            Cancel
+                          </button>
                         </div>
                       )
                     ) : b.occupants?.length ? (
                       <div style={{ display: "grid", gap: "7px" }}>
                         {b.occupants.map((o, i) => (
-                          <div key={o._id || i} style={{ display: "flex", alignItems: "center", justifyContent: "space-between", gap: "8px", padding: "6px 10px", background: "#f8f9fa", borderRadius: "7px", flexWrap: "wrap" }}>
-                            <span style={{ fontSize: "12px" }}><strong>{o.name || `Person ${i + 1}`}</strong><br /><span style={{ color: "#777" }}>{o.room?.roomNumber ? `Room ${o.room.roomNumber}` : "No room"} · {o.status}</span></span>
-                            {o.status === "confirmed" && <button className="btn btn-primary" style={{ minWidth: "80px", padding: "6px 8px", fontSize: "11px" }} onClick={() => recordOccupantStatus(b._id, o._id, "checked-in", o.name)}>Check In</button>}
-                            {o.status === "checked-in" && <button className="btn btn-primary" style={{ minWidth: "80px", padding: "6px 8px", fontSize: "11px" }} onClick={() => recordOccupantStatus(b._id, o._id, "checked-out", o.name)}>Check Out</button>}
-                            {o.status === "checked-out" && <span style={{ fontSize: "11px", color: "#4a5568" }}>Released</span>}
+                          <div 
+                            key={o._id || i} 
+                            style={{ 
+                              display: "flex", 
+                              alignItems: "center", 
+                              justifyContent: "space-between", 
+                              gap: "8px", 
+                              padding: "6px 10px", 
+                              background: "#f8f9fa", 
+                              borderRadius: "7px", 
+                              flexWrap: "wrap" 
+                            }}
+                          >
+                            <span style={{ fontSize: "12px" }}>
+                              <strong>{o.name || `Person ${i + 1}`}</strong>
+                              <br />
+                              <span style={{ color: "#777" }}>
+                                {o.room?.roomNumber ? `Room ${o.room.roomNumber}` : "No room"} · {o.status}
+                              </span>
+                            </span>
+                            {o.status === "confirmed" && (
+                              <button 
+                                className="btn btn-primary" 
+                                style={{ minWidth: "80px", padding: "6px 8px", fontSize: "11px" }} 
+                                onClick={() => recordOccupantStatus(b._id, o._id, "checked-in", o.name)}
+                              >
+                                Check In
+                              </button>
+                            )}
+                            {o.status === "checked-in" && (
+                              <button 
+                                className="btn btn-primary" 
+                                style={{ minWidth: "80px", padding: "6px 8px", fontSize: "11px" }} 
+                                onClick={() => recordOccupantStatus(b._id, o._id, "checked-out", o.name)}
+                              >
+                                Check Out
+                              </button>
+                            )}
+                            {o.status === "checked-out" && (
+                              <span style={{ fontSize: "11px", color: "#4a5568" }}>Released</span>
+                            )}
                           </div>
                         ))}
-                        <button className="btn btn-danger" style={{ minWidth: "80px" }} onClick={() => cancelBooking(b._id)}>Cancel</button>
+                        <button className="btn btn-danger" style={{ minWidth: "80px" }} onClick={() => cancelBooking(b._id)}>
+                          Cancel
+                        </button>
                       </div>
                     ) : b.status === "confirmed" ? (
                       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                        <button className="btn btn-primary" style={{ minWidth: "110px" }} onClick={() => recordCheckin(b._id)}>Check In</button>
+                        <button className="btn btn-primary" style={{ minWidth: "110px" }} onClick={() => recordCheckin(b._id)}>
+                          Check In
+                        </button>
                         {reallocatingId === b._id ? (
                           <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
-                            <select value={reallocateRoomId} onChange={(e) => setReallocateRoomId(e.target.value)} style={{ width: "200px", marginBottom: 0, fontSize: "12px" }}>
+                            <select 
+                              value={reallocateRoomId} 
+                              onChange={(e) => setReallocateRoomId(e.target.value)} 
+                              style={{ width: "200px", marginBottom: 0, fontSize: "12px" }}
+                            >
                               <option value="">Select new room...</option>
-                              {reallocateRooms.map((r) => <option key={r._id} value={r._id}>Room {r.roomNumber}{r.hostelSection ? ` — ${r.hostelSection}` : ""}</option>)}
+                              {reallocateRooms.map((r) => (
+                                <option key={r._id} value={r._id}>
+                                  Room {r.roomNumber}{r.hostelSection ? ` — ${r.hostelSection}` : ""}
+                                </option>
+                              ))}
                             </select>
-                            <button className="btn btn-primary" style={{ padding: "5px 10px", fontSize: "12px" }} onClick={() => confirmReallocate(b._id)}>Confirm</button>
-                            <button className="btn btn-secondary" style={{ padding: "5px 10px", fontSize: "12px" }} onClick={() => { setReallocatingId(null); setReallocateRoomId(""); }}>✕</button>
+                            <button className="btn btn-primary" style={{ padding: "5px 10px", fontSize: "12px" }} onClick={() => confirmReallocate(b._id)}>
+                              Confirm
+                            </button>
+                            <button 
+                              className="btn btn-secondary" 
+                              style={{ padding: "5px 10px", fontSize: "12px" }} 
+                              onClick={() => { setReallocatingId(null); setReallocateRoomId(""); }}
+                            >
+                              ✕
+                            </button>
                           </div>
                         ) : (
-                          <button className="btn btn-secondary" style={{ minWidth: "110px" }} onClick={() => openReallocate(b)}>🔄 Change Room</button>
+                          <button className="btn btn-secondary" style={{ minWidth: "110px" }} onClick={() => openReallocate(b)}>
+                            🔄 Change Room
+                          </button>
                         )}
                       </div>
                     ) : b.status === "checked-in" ? (
                       <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
-                        <button className="btn btn-primary" style={{ minWidth: "120px" }} onClick={() => recordCheckout(b._id)}>Check Out</button>
+                        <button className="btn btn-primary" style={{ minWidth: "120px" }} onClick={() => recordCheckout(b._id)}>
+                          Check Out
+                        </button>
                         {reallocatingId === b._id ? (
                           <div style={{ display: "flex", gap: "8px", alignItems: "center", flexWrap: "wrap" }}>
-                            <select value={reallocateRoomId} onChange={(e) => setReallocateRoomId(e.target.value)} style={{ width: "200px", marginBottom: 0, fontSize: "12px" }}>
+                            <select 
+                              value={reallocateRoomId} 
+                              onChange={(e) => setReallocateRoomId(e.target.value)} 
+                              style={{ width: "200px", marginBottom: 0, fontSize: "12px" }}
+                            >
                               <option value="">Select new room...</option>
-                              {reallocateRooms.map((r) => <option key={r._id} value={r._id}>Room {r.roomNumber}{r.hostelSection ? ` — ${r.hostelSection}` : ""}</option>)}
+                              {reallocateRooms.map((r) => (
+                                <option key={r._id} value={r._id}>
+                                  Room {r.roomNumber}{r.hostelSection ? ` — ${r.hostelSection}` : ""}
+                                </option>
+                              ))}
                             </select>
-                            <button className="btn btn-primary" style={{ padding: "5px 10px", fontSize: "12px" }} onClick={() => confirmReallocate(b._id)}>Confirm</button>
-                            <button className="btn btn-secondary" style={{ padding: "5px 10px", fontSize: "12px" }} onClick={() => { setReallocatingId(null); setReallocateRoomId(""); }}>✕</button>
+                            <button className="btn btn-primary" style={{ padding: "5px 10px", fontSize: "12px" }} onClick={() => confirmReallocate(b._id)}>
+                              Confirm
+                            </button>
+                            <button 
+                              className="btn btn-secondary" 
+                              style={{ padding: "5px 10px", fontSize: "12px" }} 
+                              onClick={() => { setReallocatingId(null); setReallocateRoomId(""); }}
+                            >
+                              ✕
+                            </button>
                           </div>
                         ) : (
-                          <button className="btn btn-secondary" style={{ minWidth: "110px" }} onClick={() => openReallocate(b)}>🔄 Change Room</button>
+                          <button className="btn btn-secondary" style={{ minWidth: "110px" }} onClick={() => openReallocate(b)}>
+                            🔄 Change Room
+                          </button>
                         )}
                       </div>
                     ) : b.status === "cancelled" || b.status === "rejected" ? (
-                      <button className="btn btn-danger" style={{ fontSize: "12px", padding: "6px 10px" }} onClick={() => deleteBookingRecord(b._id)}>🗑️ Delete History</button>
+                      <button className="btn btn-danger" style={{ fontSize: "12px", padding: "6px 10px" }} onClick={() => deleteBookingRecord(b._id)}>
+                        🗑️ Delete History
+                      </button>
                     ) : (
-                      <button className="btn btn-danger" style={{ minWidth: "80px" }} onClick={() => cancelBooking(b._id)}>Cancel Booking</button>
+                      <button className="btn btn-danger" style={{ minWidth: "80px" }} onClick={() => cancelBooking(b._id)}>
+                        Cancel Booking
+                      </button>
                     )}
                   </div>
                 </div>
@@ -1227,7 +1724,9 @@ export default function AdminDashboard() {
 
                 <div>
                   {visibleRows.length ? visibleRows.map(renderRow) : (
-                    <p style={{ textAlign: "center", color: "#888", padding: "40px" }}>{emptyTextByKey[activeSub.key]}</p>
+                    <p style={{ textAlign: "center", color: "#888", padding: "40px" }}>
+                      {emptyTextByKey[activeSub.key]}
+                    </p>
                   )}
                 </div>
                 {activeSub.list.length > bookingsShown && (
@@ -1243,7 +1742,7 @@ export default function AdminDashboard() {
         </>
       )}
 
-      {/* ROOMS TAB */}
+      {/* ===== ROOMS TAB ===== */}
       {tab === "Rooms" && (
         <>
           <div style={{ marginBottom: "16px", display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
@@ -1257,7 +1756,12 @@ export default function AdminDashboard() {
               {healthChecking ? "Checking..." : "🩺 Check Room Health"}
             </button>
             {msg && <span className="success">✅ {msg}</span>}
-            <input placeholder="🔍 Search by room number or category..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ maxWidth: "300px", marginBottom: 0 }} />
+            <input 
+              placeholder="🔍 Search by room number or category..." 
+              value={search} 
+              onChange={(e) => setSearch(e.target.value)} 
+              style={{ maxWidth: "300px", marginBottom: 0 }} 
+            />
             <span style={{ color: "#888", fontSize: "13px" }}>{filteredRooms.length} rooms</span>
           </div>
 
@@ -1327,10 +1831,15 @@ export default function AdminDashboard() {
                       />
                     </div>
                     <button className="btn btn-primary" onClick={saveBlock}>Save Changes</button>
-                    <button className="btn btn-secondary" onClick={() => { 
-                      setEditingBlock(null); 
-                      setBlockForm({ name: "", accommodationType: "outside_hostel", usesCategories: true, description: "" }); 
-                    }}>Cancel</button>
+                    <button 
+                      className="btn btn-secondary" 
+                      onClick={() => { 
+                        setEditingBlock(null); 
+                        setBlockForm({ name: "", accommodationType: "outside_hostel", usesCategories: true, description: "" }); 
+                      }}
+                    >
+                      Cancel
+                    </button>
                   </div>
                 </div>
               )}
@@ -1355,10 +1864,14 @@ export default function AdminDashboard() {
                           {block.name}
                         </strong>
                         {block.active === false && (
-                          <span style={{ marginLeft: "8px", fontSize: "11px", background: "#fed7d7", color: "#9b2c2c", padding: "2px 7px", borderRadius: "20px" }}>Inactive</span>
+                          <span style={{ marginLeft: "8px", fontSize: "11px", background: "#fed7d7", color: "#9b2c2c", padding: "2px 7px", borderRadius: "20px" }}>
+                            Inactive
+                          </span>
                         )}
                         {block.active !== false && (
-                          <span style={{ marginLeft: "8px", fontSize: "11px", background: "#c6f6d5", color: "#276749", padding: "2px 7px", borderRadius: "20px" }}>Active</span>
+                          <span style={{ marginLeft: "8px", fontSize: "11px", background: "#c6f6d5", color: "#276749", padding: "2px 7px", borderRadius: "20px" }}>
+                            Active
+                          </span>
                         )}
                       </div>
                       <div style={{ display: "flex", gap: "6px", flexWrap: "wrap" }}>
@@ -1403,20 +1916,51 @@ export default function AdminDashboard() {
 
                     {expandedBlock === block._id && (
                       <div style={{ padding: "12px 14px", background: "#fff" }}>
-                        <p style={{ fontSize: "12px", color: "#666", margin: "0 0 8px" }}>Sub-blocks inside <strong>{block.name}</strong>:</p>
+                        <p style={{ fontSize: "12px", color: "#666", margin: "0 0 8px" }}>
+                          Sub-blocks inside <strong>{block.name}</strong>:
+                        </p>
                         {block.subBlocks?.length === 0 && <p style={{ fontSize: "12px", color: "#999" }}>No sub-blocks yet.</p>}
                         {block.subBlocks?.map((sub) => (
-                          <div key={sub._id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", padding: "6px 10px", background: sub.active !== false ? "#f8f9fa" : "#fff5f5", borderRadius: "7px", marginBottom: "6px", flexWrap: "wrap", gap: "6px" }}>
+                          <div 
+                            key={sub._id} 
+                            style={{ 
+                              display: "flex", 
+                              justifyContent: "space-between", 
+                              alignItems: "center", 
+                              padding: "6px 10px", 
+                              background: sub.active !== false ? "#f8f9fa" : "#fff5f5", 
+                              borderRadius: "7px", 
+                              marginBottom: "6px", 
+                              flexWrap: "wrap", 
+                              gap: "6px" 
+                            }}
+                          >
                             <span style={{ fontSize: "13px", color: sub.active !== false ? "#333" : "#999" }}>
                               {sub.name}
                               {sub.active === false && <span style={{ marginLeft: "6px", fontSize: "11px", color: "#c53030" }}>(inactive)</span>}
                             </span>
                             <div style={{ display: "flex", gap: "5px" }}>
-                              <button className="btn btn-secondary" style={{ padding: "3px 7px", fontSize: "11px" }} onClick={() => { setEditingSubBlock(sub); setEditingSubBlockParent(block._id); setSubBlockName(sub.name); }}>✎ Edit</button>
-                              <button className="btn btn-secondary" style={{ padding: "3px 7px", fontSize: "11px" }} onClick={() => toggleSubBlockActive(block._id, sub._id, sub.active)}>
+                              <button 
+                                className="btn btn-secondary" 
+                                style={{ padding: "3px 7px", fontSize: "11px" }} 
+                                onClick={() => { setEditingSubBlock(sub); setEditingSubBlockParent(block._id); setSubBlockName(sub.name); }}
+                              >
+                                ✎ Edit
+                              </button>
+                              <button 
+                                className="btn btn-secondary" 
+                                style={{ padding: "3px 7px", fontSize: "11px" }} 
+                                onClick={() => toggleSubBlockActive(block._id, sub._id, sub.active)}
+                              >
                                 {sub.active !== false ? "⏸" : "▶"}
                               </button>
-                              <button className="btn btn-danger" style={{ padding: "3px 7px", fontSize: "11px" }} onClick={() => deleteSubBlock(block._id, sub._id, sub.name)}>🗑️</button>
+                              <button 
+                                className="btn btn-danger" 
+                                style={{ padding: "3px 7px", fontSize: "11px" }} 
+                                onClick={() => deleteSubBlock(block._id, sub._id, sub.name)}
+                              >
+                                🗑️
+                              </button>
                             </div>
                           </div>
                         ))}
@@ -1427,7 +1971,9 @@ export default function AdminDashboard() {
                             placeholder="New sub-block name" 
                             style={{ width: "200px", marginBottom: 0, padding: "6px 10px", border: "1px solid #ddd", borderRadius: "4px" }} 
                           />
-                          <button className="btn btn-primary" style={{ padding: "6px 12px", fontSize: "12px" }} onClick={() => saveSubBlock(block._id)}>+ Add</button>
+                          <button className="btn btn-primary" style={{ padding: "6px 12px", fontSize: "12px" }} onClick={() => saveSubBlock(block._id)}>
+                            + Add
+                          </button>
                         </div>
                       </div>
                     )}
@@ -1478,11 +2024,16 @@ export default function AdminDashboard() {
                     {editingSubBlock ? "Update Subblock" : "+ Add Subblock"}
                   </button>
                   {editingSubBlock && (
-                    <button className="btn btn-secondary" onClick={() => { 
-                      setEditingSubBlock(null); 
-                      setEditingSubBlockParent(""); 
-                      setSubBlockName(""); 
-                    }}>Cancel</button>
+                    <button 
+                      className="btn btn-secondary" 
+                      onClick={() => { 
+                        setEditingSubBlock(null); 
+                        setEditingSubBlockParent(""); 
+                        setSubBlockName(""); 
+                      }}
+                    >
+                      Cancel
+                    </button>
                   )}
                 </div>
                 <p style={{ fontSize: "12px", color: "#666", margin: "8px 0 0" }}>
@@ -1493,32 +2044,94 @@ export default function AdminDashboard() {
               {/* Categories */}
               <div>
                 <h4 style={{ margin: "0 0 12px", fontSize: "14px" }}>🏷️ Categories</h4>
-                <p style={{ margin: "0 0 12px", color: "#666", fontSize: "12px" }}>Categories are global room types. Assign them to rooms when creating or editing a room.</p>
+                <p style={{ margin: "0 0 12px", color: "#666", fontSize: "12px" }}>
+                  Categories are global room types. Assign them to rooms when creating or editing a room.
+                </p>
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "14px", alignItems: "flex-end" }}>
                   <div>
                     <label style={{ fontSize: "12px", display: "block", marginBottom: "3px" }}>Name *</label>
-                    <input value={catForm.name} onChange={(e) => setCatForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Standard" style={{ width: "140px", marginBottom: 0 }} />
+                    <input 
+                      value={catForm.name} 
+                      onChange={(e) => setCatForm((f) => ({ ...f, name: e.target.value }))} 
+                      placeholder="e.g. Standard" 
+                      style={{ width: "140px", marginBottom: 0 }} 
+                    />
                   </div>
                   <div>
                     <label style={{ fontSize: "12px", display: "block", marginBottom: "3px" }}>Price (RWF) *</label>
-                    <input type="number" min="1" value={catForm.price} onChange={(e) => setCatForm((f) => ({ ...f, price: e.target.value }))} placeholder="e.g. 35000" style={{ width: "130px", marginBottom: 0 }} />
+                    <input 
+                      type="number" 
+                      min="1" 
+                      value={catForm.price} 
+                      onChange={(e) => setCatForm((f) => ({ ...f, price: e.target.value }))} 
+                      placeholder="e.g. 35000" 
+                      style={{ width: "130px", marginBottom: 0 }} 
+                    />
                   </div>
                   <div>
                     <label style={{ fontSize: "12px", display: "block", marginBottom: "3px" }}>Capacity</label>
-                    <input type="number" min="1" value={catForm.capacity} onChange={(e) => setCatForm((f) => ({ ...f, capacity: e.target.value }))} style={{ width: "80px", marginBottom: 0 }} />
+                    <input 
+                      type="number" 
+                      min="1" 
+                      value={catForm.capacity} 
+                      onChange={(e) => setCatForm((f) => ({ ...f, capacity: e.target.value }))} 
+                      style={{ width: "80px", marginBottom: 0 }} 
+                    />
                   </div>
-                  <button className="btn btn-primary" onClick={saveCat}>{editingCat ? "Update" : "+ Add"}</button>
-                  {editingCat && <button className="btn btn-secondary" onClick={() => { setEditingCat(null); setCatForm({ name: "", price: "", description: "", capacity: 2 }); }}>✕</button>}
+                  <button className="btn btn-primary" onClick={saveCat}>
+                    {editingCat ? "Update" : "+ Add"}
+                  </button>
+                  {editingCat && (
+                    <button 
+                      className="btn btn-secondary" 
+                      onClick={() => { setEditingCat(null); setCatForm({ name: "", price: "", description: "", capacity: 2 }); }}
+                    >
+                      ✕
+                    </button>
+                  )}
                 </div>
 
                 {categories.length === 0 && <p style={{ color: "#999", fontSize: "13px" }}>No categories yet.</p>}
                 <div style={{ display: "grid", gap: "8px" }}>
                   {categories.map((cat) => (
-                    <div key={cat._id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px", flexWrap: "wrap", padding: "10px 12px", border: "1px solid #e2e8f0", borderRadius: "8px", opacity: cat.active ? 1 : 0.55 }}>
-                      <div><strong>{cat.name}</strong><span style={{ marginLeft: "10px", color: "#666", fontSize: "12px" }}>{Number(cat.price).toLocaleString()} RWF · capacity {cat.capacity}</span><span style={{ marginLeft: "8px", fontSize: "11px", color: cat.active ? "#276749" : "#9b2c2c" }}>{cat.active ? "Active" : "Inactive"}</span></div>
+                    <div 
+                      key={cat._id} 
+                      style={{ 
+                        display: "flex", 
+                        justifyContent: "space-between", 
+                        alignItems: "center", 
+                        gap: "10px", 
+                        flexWrap: "wrap", 
+                        padding: "10px 12px", 
+                        border: "1px solid #e2e8f0", 
+                        borderRadius: "8px", 
+                        opacity: cat.active ? 1 : 0.55 
+                      }}
+                    >
+                      <div>
+                        <strong>{cat.name}</strong>
+                        <span style={{ marginLeft: "10px", color: "#666", fontSize: "12px" }}>
+                          {Number(cat.price).toLocaleString()} RWF · capacity {cat.capacity}
+                        </span>
+                        <span style={{ marginLeft: "8px", fontSize: "11px", color: cat.active ? "#276749" : "#9b2c2c" }}>
+                          {cat.active ? "Active" : "Inactive"}
+                        </span>
+                      </div>
                       <div style={{ display: "flex", gap: "5px" }}>
-                        <button className="btn btn-secondary" style={{ padding: "4px 8px", fontSize: "11px" }} onClick={() => { setEditingCat(cat); setCatForm({ name: cat.name, price: cat.price, description: cat.description || "", capacity: cat.capacity || 2 }); }}>✎ Edit</button>
-                        <button className="btn btn-secondary" style={{ padding: "4px 8px", fontSize: "11px" }} onClick={() => toggleCatActive(cat)}>{cat.active ? "Deactivate" : "Activate"}</button>
+                        <button 
+                          className="btn btn-secondary" 
+                          style={{ padding: "4px 8px", fontSize: "11px" }} 
+                          onClick={() => { setEditingCat(cat); setCatForm({ name: cat.name, price: cat.price, description: cat.description || "", capacity: cat.capacity || 2 }); }}
+                        >
+                          ✎ Edit
+                        </button>
+                        <button 
+                          className="btn btn-secondary" 
+                          style={{ padding: "4px 8px", fontSize: "11px" }} 
+                          onClick={() => toggleCatActive(cat)}
+                        >
+                          {cat.active ? "Deactivate" : "Activate"}
+                        </button>
                       </div>
                     </div>
                   ))}
@@ -1527,13 +2140,19 @@ export default function AdminDashboard() {
             </div>
           )}
 
-          <p style={{ color: "#888", fontSize: "12px", marginBottom: "16px" }}></p>
           {addRoomError && !showAddRoom && <p className="error" style={{ marginBottom: "16px" }}>⚠️ {addRoomError}</p>}
           {healthResult && (
-            <div className="card" style={{ padding: "16px", marginBottom: "20px", background: healthResult.duplicateGroupsFound > 0 || healthResult.merged?.length > 0 ? "#fffaf0" : "#f0fff4", border: `1px solid ${healthResult.duplicateGroupsFound > 0 || healthResult.merged?.length > 0 ? "#f0e0c0" : "#9ae6b4"}` }}>
+            <div className="card" style={{ 
+              padding: "16px", 
+              marginBottom: "20px", 
+              background: healthResult.duplicateGroupsFound > 0 || healthResult.merged?.length > 0 ? "#fffaf0" : "#f0fff4", 
+              border: `1px solid ${healthResult.duplicateGroupsFound > 0 || healthResult.merged?.length > 0 ? "#f0e0c0" : "#9ae6b4"}` 
+            }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", gap: "12px", flexWrap: "wrap" }}>
                 <p style={{ margin: 0, fontSize: "14px" }}>{healthResult.message}</p>
-                <button className="btn btn-secondary" style={{ padding: "4px 10px", fontSize: "12px" }} onClick={() => setHealthResult(null)}>✕</button>
+                <button className="btn btn-secondary" style={{ padding: "4px 10px", fontSize: "12px" }} onClick={() => setHealthResult(null)}>
+                  ✕
+                </button>
               </div>
               {healthResult.dryRun && healthResult.duplicateGroupsFound > 0 && (
                 <button className="btn btn-primary" style={{ marginTop: "12px" }} onClick={() => checkRoomHealth(false)} disabled={healthChecking}>
@@ -1551,8 +2170,20 @@ export default function AdminDashboard() {
                 Choose a Block and Category to add rooms.
               </p>
               <div style={{ marginBottom: "14px", display: "flex", gap: "8px" }}>
-                <button type="button" className={bulkMode ? "btn btn-secondary" : "btn btn-primary"} onClick={() => { setBulkMode(false); setAddRoomError(""); }}>Single Room</button>
-                <button type="button" className={bulkMode ? "btn btn-primary" : "btn btn-secondary"} onClick={() => { setBulkMode(true); setAddRoomError(""); }}>Multiple Rooms</button>
+                <button 
+                  type="button" 
+                  className={bulkMode ? "btn btn-secondary" : "btn btn-primary"} 
+                  onClick={() => { setBulkMode(false); setAddRoomError(""); }}
+                >
+                  Single Room
+                </button>
+                <button 
+                  type="button" 
+                  className={bulkMode ? "btn btn-primary" : "btn btn-secondary"} 
+                  onClick={() => { setBulkMode(true); setAddRoomError(""); }}
+                >
+                  Multiple Rooms
+                </button>
               </div>
               <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "flex-end" }}>
                 <div>
@@ -1578,32 +2209,60 @@ export default function AdminDashboard() {
                   </select>
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: "12px", marginBottom: "4px" }}>{bulkMode ? "Room numbers" : "Room Number *"}</label>
+                  <label style={{ display: "block", fontSize: "12px", marginBottom: "4px" }}>
+                    {bulkMode ? "Room numbers" : "Room Number *"}
+                  </label>
                   {bulkMode ? (
                     <div>
-                      <input value={bulkRoomNumbers} onChange={(e) => setBulkRoomNumbers(e.target.value)} placeholder="101, 102, 103 (optional)" style={{ width: "230px", marginBottom: "5px" }} />
+                      <input 
+                        value={bulkRoomNumbers} 
+                        onChange={(e) => setBulkRoomNumbers(e.target.value)} 
+                        placeholder="101, 102, 103 (optional)" 
+                        style={{ width: "230px", marginBottom: "5px" }} 
+                      />
                       <div style={{ fontSize: "11px", color: "#777" }}>Or use a starting number below.</div>
                     </div>
                   ) : (
-                    <input value={newRoom.roomNumber} onChange={(e) => setNewRoom((r) => ({ ...r, roomNumber: e.target.value }))} placeholder="e.g. 101" style={{ width: "140px", marginBottom: 0 }} />
+                    <input 
+                      value={newRoom.roomNumber} 
+                      onChange={(e) => setNewRoom((r) => ({ ...r, roomNumber: e.target.value }))} 
+                      placeholder="e.g. 101" 
+                      style={{ width: "140px", marginBottom: 0 }} 
+                    />
                   )}
                 </div>
                 {bulkMode && (
                   <>
                     <div>
                       <label style={{ display: "block", fontSize: "12px", marginBottom: "4px" }}>Start number</label>
-                      <input value={bulkStartNumber} onChange={(e) => setBulkStartNumber(e.target.value.replace(/\D/g, ""))} placeholder="e.g. 101" style={{ width: "120px", marginBottom: 0 }} />
+                      <input 
+                        value={bulkStartNumber} 
+                        onChange={(e) => setBulkStartNumber(e.target.value.replace(/\D/g, ""))} 
+                        placeholder="e.g. 101" 
+                        style={{ width: "120px", marginBottom: 0 }} 
+                      />
                     </div>
                     <div>
                       <label style={{ display: "block", fontSize: "12px", marginBottom: "4px" }}>How many?</label>
-                      <input type="number" min="1" max="200" value={bulkCount} onChange={(e) => setBulkCount(e.target.value)} style={{ width: "90px", marginBottom: 0 }} />
+                      <input 
+                        type="number" 
+                        min="1" 
+                        max="200" 
+                        value={bulkCount} 
+                        onChange={(e) => setBulkCount(e.target.value)} 
+                        style={{ width: "90px", marginBottom: 0 }} 
+                      />
                     </div>
                   </>
                 )}
                 {newRoom.accommodationType === "ilpd_building" && (
                   <div>
                     <label style={{ display: "block", fontSize: "12px", marginBottom: "4px" }}>Category *</label>
-                    <select value={newRoom.category} onChange={(e) => setNewRoom((r) => ({ ...r, category: e.target.value }))} style={{ width: "130px", marginBottom: 0 }}>
+                    <select 
+                      value={newRoom.category} 
+                      onChange={(e) => setNewRoom((r) => ({ ...r, category: e.target.value }))} 
+                      style={{ width: "130px", marginBottom: 0 }}
+                    >
                       {categories.filter((c) => c.active).map((c) => (
                         <option key={c._id || c.name} value={c.name}>{c.name}</option>
                       ))}
@@ -1612,36 +2271,88 @@ export default function AdminDashboard() {
                 )}
                 <div>
                   <label style={{ display: "block", fontSize: "12px", marginBottom: "4px" }}>Price (RWF) *</label>
-                  <input type="number" min="1" value={newRoom.price} onChange={(e) => setNewRoom((r) => ({ ...r, price: e.target.value }))} placeholder="e.g. 35000" style={{ width: "160px", marginBottom: 0 }} />
+                  <input 
+                    type="number" 
+                    min="1" 
+                    value={newRoom.price} 
+                    onChange={(e) => setNewRoom((r) => ({ ...r, price: e.target.value }))} 
+                    placeholder="e.g. 35000" 
+                    style={{ width: "160px", marginBottom: 0 }} 
+                  />
                 </div>
                 <div>
                   <label style={{ display: "block", fontSize: "12px", marginBottom: "4px" }}>Location *</label>
-                  <input value={newRoom.address} onChange={(e) => setNewRoom((r) => ({ ...r, address: e.target.value }))} placeholder="e.g. Nyanza, Southern Province, Rwanda" style={{ width: "300px", marginBottom: 0 }} />
+                  <input 
+                    value={newRoom.address} 
+                    onChange={(e) => setNewRoom((r) => ({ ...r, address: e.target.value }))} 
+                    placeholder="e.g. Nyanza, Southern Province, Rwanda" 
+                    style={{ width: "300px", marginBottom: 0 }} 
+                  />
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: "12px", marginBottom: "4px" }}>Room photos (optional, up to {MAX_ROOM_PHOTOS})</label>
-                  <input type="file" accept="image/jpeg,image/png,image/webp" multiple disabled={newRoom.images.length >= MAX_ROOM_PHOTOS} onChange={(e) => { addRoomPhotos(e.target.files); e.target.value = ""; }} style={{ width: "280px", marginBottom: 0 }} />
+                  <label style={{ display: "block", fontSize: "12px", marginBottom: "4px" }}>
+                    Room photos (optional, up to {MAX_ROOM_PHOTOS})
+                  </label>
+                  <input 
+                    type="file" 
+                    accept="image/jpeg,image/png,image/webp" 
+                    multiple 
+                    disabled={newRoom.images.length >= MAX_ROOM_PHOTOS} 
+                    onChange={(e) => { addRoomPhotos(e.target.files); e.target.value = ""; }} 
+                    style={{ width: "280px", marginBottom: 0 }} 
+                  />
                 </div>
                 {newRoom.images.length > 0 && (
                   <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                     {newRoom.images.map((img, i) => (
                       <div key={i} style={{ position: "relative" }}>
-                        <img src={img} alt={`Room preview ${i + 1}`} style={{ width: "70px", height: "60px", objectFit: "cover", borderRadius: "8px", border: "1px solid #ddd" }} />
-                        <button type="button" onClick={() => removeRoomPhoto(i)} style={{ position: "absolute", top: "-6px", right: "-6px", background: "#c53030", color: "#fff", border: "none", borderRadius: "50%", width: "18px", height: "18px", fontSize: "11px", cursor: "pointer", lineHeight: "18px", padding: 0 }}>✕</button>
+                        <img 
+                          src={img} 
+                          alt={`Room preview ${i + 1}`} 
+                          style={{ width: "70px", height: "60px", objectFit: "cover", borderRadius: "8px", border: "1px solid #ddd" }} 
+                        />
+                        <button 
+                          type="button" 
+                          onClick={() => removeRoomPhoto(i)} 
+                          style={{ 
+                            position: "absolute", 
+                            top: "-6px", 
+                            right: "-6px", 
+                            background: "#c53030", 
+                            color: "#fff", 
+                            border: "none", 
+                            borderRadius: "50%", 
+                            width: "18px", 
+                            height: "18px", 
+                            fontSize: "11px", 
+                            cursor: "pointer", 
+                            lineHeight: "18px", 
+                            padding: 0 
+                          }}
+                        >
+                          ✕
+                        </button>
                       </div>
                     ))}
                   </div>
                 )}
-                <button className="btn btn-primary" type={bulkMode ? "button" : "submit"} onClick={bulkMode ? createBulkRooms : undefined} disabled={bulkMode ? bulkCreating : addingRoom}>
+                <button 
+                  className="btn btn-primary" 
+                  type={bulkMode ? "button" : "submit"} 
+                  onClick={bulkMode ? createBulkRooms : undefined} 
+                  disabled={bulkMode ? bulkCreating : addingRoom}
+                >
                   {bulkMode ? (bulkCreating ? "Creating..." : "Create Rooms") : (addingRoom ? "Creating..." : "Create Room")}
                 </button>
-                <button className="btn btn-secondary" type="button" onClick={() => setShowAddRoom(false)}>Cancel</button>
+                <button className="btn btn-secondary" type="button" onClick={() => setShowAddRoom(false)}>
+                  Cancel
+                </button>
               </div>
               {addRoomError && <div style={{ color: "#c53030", fontSize: "13px", marginTop: "12px" }}>{addRoomError}</div>}
             </form>
           )}
 
-          {/* Rooms Table */}
+          {/* Rooms Table - DELETE ROOM IN STATUS DROPDOWN */}
           <div style={{ overflowX: "auto" }}>
             <table style={styles.table}>
               <thead>
@@ -1668,7 +2379,13 @@ export default function AdminDashboard() {
                     <td style={styles.td}>
                       <select 
                         value={r.status} 
-                        onChange={(e) => updateRoomStatus(r._id, e.target.value)} 
+                        onChange={(e) => {
+                          if (e.target.value === "delete") {
+                            deleteRoom(r._id);
+                          } else {
+                            updateRoomStatus(r._id, e.target.value);
+                          }
+                        }} 
                         style={{ 
                           width: "100%", 
                           padding: "4px 8px", 
@@ -1683,6 +2400,7 @@ export default function AdminDashboard() {
                         <option value="available" style={{ backgroundColor: "#c6f6d5", color: "#276749" }}>Available</option>
                         <option value="booked" style={{ backgroundColor: "#fed7d7", color: "#9b2c2c" }}>Booked</option>
                         <option value="maintenance" style={{ backgroundColor: "#fefcbf", color: "#744210" }}>Maintenance</option>
+                        <option value="delete" style={{ backgroundColor: "#fed7d7", color: "#9b2c2c", fontWeight: "bold" }}>🗑️ Delete Room</option>
                       </select>
                     </td>
                   </tr>
@@ -1700,72 +2418,150 @@ export default function AdminDashboard() {
         </>
       )}
 
-      {/* ROOM EDIT MODAL */}
+      {/* ===== ROOM EDIT MODAL ===== */}
       {editingRoom && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", zIndex: 3500, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }} onClick={() => setEditingRoom(null)}>
-          <div style={{ background: "#fff", width: "min(520px, 100%)", borderRadius: "14px", padding: "24px", maxHeight: "90vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+        <div 
+          style={{ 
+            position: "fixed", 
+            inset: 0, 
+            background: "rgba(0,0,0,.55)", 
+            zIndex: 3500, 
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "center", 
+            padding: "20px" 
+          }} 
+          onClick={() => setEditingRoom(null)}
+        >
+          <div 
+            style={{ 
+              background: "#fff", 
+              width: "min(520px, 100%)", 
+              borderRadius: "14px", 
+              padding: "24px", 
+              maxHeight: "90vh", 
+              overflowY: "auto" 
+            }} 
+            onClick={(e) => e.stopPropagation()}
+          >
             <h3 style={{ margin: "0 0 16px" }}>✎ Edit Room {editingRoom.roomNumber}</h3>
             <div style={{ display: "grid", gap: "12px" }}>
               <div>
                 <label style={{ fontSize: "12px", display: "block", marginBottom: "3px" }}>Room Number</label>
-                <input value={editRoomForm.roomNumber || ""} onChange={(e) => setEditRoomForm((f) => ({ ...f, roomNumber: e.target.value }))} style={{ width: "100%", marginBottom: 0 }} />
+                <input 
+                  value={editRoomForm.roomNumber || ""} 
+                  onChange={(e) => setEditRoomForm((f) => ({ ...f, roomNumber: e.target.value }))} 
+                  style={{ width: "100%", marginBottom: 0 }} 
+                />
               </div>
               <div>
                 <label style={{ fontSize: "12px", display: "block", marginBottom: "3px" }}>Category</label>
-                <input list="edit-room-categories" value={editRoomForm.category || ""} onChange={(e) => setEditRoomForm((f) => ({ ...f, category: e.target.value }))} style={{ width: "100%", marginBottom: 0 }} />
+                <input 
+                  list="edit-room-categories" 
+                  value={editRoomForm.category || ""} 
+                  onChange={(e) => setEditRoomForm((f) => ({ ...f, category: e.target.value }))} 
+                  style={{ width: "100%", marginBottom: 0 }} 
+                />
                 <datalist id="edit-room-categories">
-                  {categories.filter((c) => c.active).map((c) => <option key={c._id} value={c.name} />)}
+                  {categories.filter((c) => c.active).map((c) => (
+                    <option key={c._id} value={c.name} />
+                  ))}
                 </datalist>
               </div>
               {knownBlocks.length > 0 && (
                 <div>
                   <label style={{ fontSize: "12px", display: "block", marginBottom: "3px" }}>Block</label>
-                  <input list="edit-room-blocks" value={editRoomForm.hostelSection || ""} onChange={(e) => setEditRoomForm((f) => ({ ...f, hostelSection: e.target.value }))} style={{ width: "100%", marginBottom: 0 }} />
-                  <datalist id="edit-room-blocks">{knownBlocks.map((b) => <option key={b} value={b} />)}</datalist>
+                  <input 
+                    list="edit-room-blocks" 
+                    value={editRoomForm.hostelSection || ""} 
+                    onChange={(e) => setEditRoomForm((f) => ({ ...f, hostelSection: e.target.value }))} 
+                    style={{ width: "100%", marginBottom: 0 }} 
+                  />
+                  <datalist id="edit-room-blocks">
+                    {knownBlocks.map((b) => <option key={b} value={b} />)}
+                  </datalist>
                 </div>
               )}
               <div>
                 <label style={{ fontSize: "12px", display: "block", marginBottom: "3px" }}>Sub-block</label>
-                <input value={editRoomForm.subBlock || ""} onChange={(e) => setEditRoomForm((f) => ({ ...f, subBlock: e.target.value }))} placeholder="Optional" style={{ width: "100%", marginBottom: 0 }} />
+                <input 
+                  value={editRoomForm.subBlock || ""} 
+                  onChange={(e) => setEditRoomForm((f) => ({ ...f, subBlock: e.target.value }))} 
+                  placeholder="Optional" 
+                  style={{ width: "100%", marginBottom: 0 }} 
+                />
               </div>
               <div>
                 <label style={{ fontSize: "12px", display: "block", marginBottom: "3px" }}>Price (RWF)</label>
-                <input type="number" min="1" value={editRoomForm.price || ""} onChange={(e) => setEditRoomForm((f) => ({ ...f, price: e.target.value }))} style={{ width: "100%", marginBottom: 0 }} />
+                <input 
+                  type="number" 
+                  min="1" 
+                  value={editRoomForm.price || ""} 
+                  onChange={(e) => setEditRoomForm((f) => ({ ...f, price: e.target.value }))} 
+                  style={{ width: "100%", marginBottom: 0 }} 
+                />
               </div>
               <div>
                 <label style={{ fontSize: "12px", display: "block", marginBottom: "3px" }}>Location</label>
-                <input value={editRoomForm.address || ""} onChange={(e) => setEditRoomForm((f) => ({ ...f, address: e.target.value }))} style={{ width: "100%", marginBottom: 0 }} />
+                <input 
+                  value={editRoomForm.address || ""} 
+                  onChange={(e) => setEditRoomForm((f) => ({ ...f, address: e.target.value }))} 
+                  style={{ width: "100%", marginBottom: 0 }} 
+                />
               </div>
               <div>
                 <label style={{ fontSize: "12px", display: "block", marginBottom: "3px" }}>Description</label>
-                <textarea value={editRoomForm.description || ""} onChange={(e) => setEditRoomForm((f) => ({ ...f, description: e.target.value }))} rows={3} style={{ width: "100%", borderRadius: "8px", border: "1px solid #ddd", padding: "8px" }} />
+                <textarea 
+                  value={editRoomForm.description || ""} 
+                  onChange={(e) => setEditRoomForm((f) => ({ ...f, description: e.target.value }))} 
+                  rows={3} 
+                  style={{ width: "100%", borderRadius: "8px", border: "1px solid #ddd", padding: "8px" }} 
+                />
               </div>
               <div style={{ display: "flex", alignItems: "center", gap: "8px" }}>
-                <input type="checkbox" id="roomActive" checked={editRoomForm.active !== false} onChange={(e) => setEditRoomForm((f) => ({ ...f, active: e.target.checked }))} />
-                <label htmlFor="roomActive" style={{ fontSize: "13px" }}>Room is active (visible to clients)</label>
+                <input 
+                  type="checkbox" 
+                  id="roomActive" 
+                  checked={editRoomForm.active !== false} 
+                  onChange={(e) => setEditRoomForm((f) => ({ ...f, active: e.target.checked }))} 
+                />
+                <label htmlFor="roomActive" style={{ fontSize: "13px" }}>
+                  Room is active (visible to clients)
+                </label>
               </div>
             </div>
             {editRoomError && <p style={{ color: "#c53030", fontSize: "13px", marginTop: "12px" }}>{editRoomError}</p>}
             <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "18px" }}>
               <button className="btn btn-secondary" onClick={() => setEditingRoom(null)}>Cancel</button>
-              <button className="btn btn-primary" onClick={saveEditRoom} disabled={editRoomSaving}>{editRoomSaving ? "Saving..." : "Save Changes"}</button>
+              <button className="btn btn-primary" onClick={saveEditRoom} disabled={editRoomSaving}>
+                {editRoomSaving ? "Saving..." : "Save Changes"}
+              </button>
             </div>
           </div>
         </div>
       )}
 
-      {/* CLIENTS TAB */}
+      {/* ===== CLIENTS TAB ===== */}
       {tab === "Clients" && (
         <>
           <div style={{ marginBottom: "16px" }}>
-            <input placeholder="🔍 Search by name or email..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ maxWidth: "400px", marginBottom: 0 }} />
+            <input 
+              placeholder="🔍 Search by name or email..." 
+              value={search} 
+              onChange={(e) => setSearch(e.target.value)} 
+              style={{ maxWidth: "400px", marginBottom: 0 }} 
+            />
             {clientMsg && <span className="success" style={{ marginLeft: "12px" }}>✅ {clientMsg}</span>}
             {clientError && <span className="error" style={{ marginLeft: "12px" }}>⚠️ {clientError}</span>}
           </div>
           <div style={{ overflowX: "auto" }}>
             <table style={styles.table}>
               <thead>
-                <tr>{["Name", "Role", "Email", "Phone", "Joined", "Total Bookings", "Total Spent"].map((h) => <th key={h} style={styles.th}>{h}</th>)}</tr>
+                <tr>
+                  {["Name", "Role", "Email", "Phone", "Joined", "Total Bookings", "Total Spent"].map((h) => (
+                    <th key={h} style={styles.th}>{h}</th>
+                  ))}
+                </tr>
               </thead>
               <tbody>
                 {clients
@@ -1779,14 +2575,26 @@ export default function AdminDashboard() {
                         <td style={styles.td}><strong>{c.name}</strong></td>
                         <td style={styles.td}>
                           {isSelf ? (
-                            <span style={{ background: "#e9d8fd", color: "#553c9a", padding: "4px 10px", borderRadius: "20px", fontSize: "12px", fontWeight: "600" }}>{c.role} (you)</span>
+                            <span style={{ background: "#e9d8fd", color: "#553c9a", padding: "4px 10px", borderRadius: "20px", fontSize: "12px", fontWeight: "600" }}>
+                              {c.role} (you)
+                            </span>
                           ) : (
                             <button
                               title={c.role === "admin" ? "Click to remove admin access" : "Click to make this person an admin"}
                               onClick={() => c.role === "admin"
                                 ? askConfirm(`Remove admin access from ${c.name}? They'll become a regular client account.`, () => setClientRole(c._id, "client", c.name))
                                 : askConfirm(`Make ${c.name} an admin? They'll get full access to this dashboard.`, () => setClientRole(c._id, "admin", c.name))}
-                              style={{ background: c.role === "admin" ? "#e9d8fd" : "#bee3f8", color: c.role === "admin" ? "#553c9a" : "#2a69ac", padding: "4px 10px", borderRadius: "20px", fontSize: "12px", fontWeight: "600", border: "none", cursor: "pointer", textDecoration: "underline dotted" }}
+                              style={{ 
+                                background: c.role === "admin" ? "#e9d8fd" : "#bee3f8", 
+                                color: c.role === "admin" ? "#553c9a" : "#2a69ac", 
+                                padding: "4px 10px", 
+                                borderRadius: "20px", 
+                                fontSize: "12px", 
+                                fontWeight: "600", 
+                                border: "none", 
+                                cursor: "pointer", 
+                                textDecoration: "underline dotted" 
+                              }}
                             >
                               {c.role} ✎
                             </button>
@@ -1801,7 +2609,11 @@ export default function AdminDashboard() {
                     );
                   })}
                 {clients.length === 0 && (
-                  <tr><td colSpan="7" style={{ ...styles.td, textAlign: "center", color: "#888", padding: "40px" }}>No clients registered yet</td></tr>
+                  <tr>
+                    <td colSpan="7" style={{ ...styles.td, textAlign: "center", color: "#888", padding: "40px" }}>
+                      No clients registered yet
+                    </td>
+                  </tr>
                 )}
               </tbody>
             </table>
@@ -1809,30 +2621,52 @@ export default function AdminDashboard() {
         </>
       )}
 
-      {/* GUEST SUPPORT TAB */}
+      {/* ===== GUEST SUPPORT TAB ===== */}
       {tab === "Guest Support" && (
         <>
           <div style={{ marginBottom: "16px", display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
-            <input placeholder="🔍 Search by concern, client or booking..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ maxWidth: "400px", marginBottom: 0 }} />
-            <input placeholder="Filter by room number..." value={concernRoomFilter} onChange={(e) => setConcernRoomFilter(e.target.value)} style={{ maxWidth: "200px", marginBottom: 0 }} />
+            <input 
+              placeholder="🔍 Search by concern, client or booking..." 
+              value={search} 
+              onChange={(e) => setSearch(e.target.value)} 
+              style={{ maxWidth: "400px", marginBottom: 0 }} 
+            />
+            <input 
+              placeholder="Filter by room number..." 
+              value={concernRoomFilter} 
+              onChange={(e) => setConcernRoomFilter(e.target.value)} 
+              style={{ maxWidth: "200px", marginBottom: 0 }} 
+            />
             {responseMsg && <span className="success">✅ {responseMsg}</span>}
             {responseError && <span className="error">⚠️ {responseError}</span>}
           </div>
           <div style={{ overflowX: "auto" }}>
             <table style={styles.table}>
               <thead>
-                <tr>{["Client", "Room", "Subject", "Message", "Status", "Response", "Action"].map((h) => <th key={h} style={styles.th}>{h}</th>)}</tr>
+                <tr>
+                  {["Client", "Room", "Subject", "Message", "Status", "Response", "Action"].map((h) => (
+                    <th key={h} style={styles.th}>{h}</th>
+                  ))}
+                </tr>
               </thead>
               <tbody>
                 {(() => {
-                  const roomFiltered = filteredConcerns.filter((c) => !concernRoomFilter.trim() || String(c.booking?.room?.roomNumber || "").includes(concernRoomFilter.trim()));
+                  const roomFiltered = filteredConcerns.filter((c) => 
+                    !concernRoomFilter.trim() || String(c.booking?.room?.roomNumber || "").includes(concernRoomFilter.trim())
+                  );
                   const sorted = [...roomFiltered].sort((a, b) => {
                     const ka = a.client?._id || a.client?.email || "";
                     const kb = b.client?._id || b.client?.email || "";
                     return ka === kb ? 0 : ka < kb ? -1 : 1;
                   });
                   if (!sorted.length) {
-                    return <tr><td colSpan="7" style={{ ...styles.td, textAlign: "center", color: "#888", padding: "40px" }}>No concerns found.</td></tr>;
+                    return (
+                      <tr>
+                        <td colSpan="7" style={{ ...styles.td, textAlign: "center", color: "#888", padding: "40px" }}>
+                          No concerns found.
+                        </td>
+                      </tr>
+                    );
                   }
                   return sorted.map((c, i) => {
                     const key = c.client?._id || c.client?.email || "unknown";
@@ -1849,21 +2683,45 @@ export default function AdminDashboard() {
                     return (
                       <tr key={c._id}>
                         {isFirstOfRun && (
-                          <td style={styles.td} rowSpan={runLength}><strong>{c.client?.name || "Client"}</strong><br /><small style={{ color: "#888" }}>{c.client?.email}</small></td>
+                          <td style={styles.td} rowSpan={runLength}>
+                            <strong>{c.client?.name || "Client"}</strong>
+                            <br />
+                            <small style={{ color: "#888" }}>{c.client?.email}</small>
+                          </td>
                         )}
-                        <td style={styles.td}>{c.booking?.room?.roomNumber ? `Room ${c.booking.room.roomNumber}` : "—"}</td>
+                        <td style={styles.td}>
+                          {c.booking?.room?.roomNumber ? `Room ${c.booking.room.roomNumber}` : "—"}
+                        </td>
                         <td style={styles.td}>{c.subject}</td>
                         <td style={styles.td}>{c.message}</td>
                         <td style={styles.td}>
-                          <span style={{ background: c.status === "open" ? "#fefcbf" : "#c6f6d5", color: c.status === "open" ? "#744210" : "#276749", padding: "4px 10px", borderRadius: "20px", fontSize: "12px", fontWeight: "600" }}>
+                          <span style={{ 
+                            background: c.status === "open" ? "#fefcbf" : "#c6f6d5", 
+                            color: c.status === "open" ? "#744210" : "#276749", 
+                            padding: "4px 10px", 
+                            borderRadius: "20px", 
+                            fontSize: "12px", 
+                            fontWeight: "600" 
+                          }}>
                             {c.status}
                           </span>
                         </td>
                         <td style={styles.td}>
-                          <textarea value={responseText[c._id] ?? c.response ?? ""} onChange={(e) => setResponseText((prev) => ({ ...prev, [c._id]: e.target.value }))} rows="2" style={{ width: "100%", minWidth: "200px", borderRadius: "8px", border: "1px solid #ddd", padding: "8px" }} />
+                          <textarea 
+                            value={responseText[c._id] ?? c.response ?? ""} 
+                            onChange={(e) => setResponseText((prev) => ({ ...prev, [c._id]: e.target.value }))} 
+                            rows="2" 
+                            style={{ width: "100%", minWidth: "200px", borderRadius: "8px", border: "1px solid #ddd", padding: "8px" }} 
+                          />
                         </td>
                         <td style={styles.td}>
-                          <button className="btn btn-primary" style={{ minWidth: "70px" }} onClick={() => updateConcernResponse(c._id, c.response)}>Save</button>
+                          <button 
+                            className="btn btn-primary" 
+                            style={{ minWidth: "70px" }} 
+                            onClick={() => updateConcernResponse(c._id, c.response)}
+                          >
+                            Save
+                          </button>
                         </td>
                       </tr>
                     );
@@ -1875,7 +2733,7 @@ export default function AdminDashboard() {
         </>
       )}
 
-      {/* SURVEYS TAB */}
+      {/* ===== SURVEYS TAB ===== */}
       {tab === "Surveys" && (
         <>
           <div className="card" style={{ padding: "16px", marginBottom: "20px" }}>
@@ -1884,34 +2742,83 @@ export default function AdminDashboard() {
               These are the open-ended questions clients see alongside their star rating. Add, remove, or turn off any question — nothing here is fixed by the system.
             </p>
             <div style={{ display: "flex", gap: "8px", marginBottom: "12px", flexWrap: "wrap" }}>
-              <input value={newSurveyQuestion} onChange={(e) => setNewSurveyQuestion(e.target.value)} placeholder="e.g. What could we improve about your stay?" style={{ flex: 1, minWidth: "240px", marginBottom: 0 }} />
+              <input 
+                value={newSurveyQuestion} 
+                onChange={(e) => setNewSurveyQuestion(e.target.value)} 
+                placeholder="e.g. What could we improve about your stay?" 
+                style={{ flex: 1, minWidth: "240px", marginBottom: 0 }} 
+              />
               <button className="btn btn-primary" onClick={addSurveyQuestion}>+ Add Question</button>
             </div>
             {surveyQuestionMsg && <p style={{ fontSize: "13px", color: "#c53030", marginBottom: "10px" }}>{surveyQuestionMsg}</p>}
             {surveyQuestions.length ? (
               <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
                 {surveyQuestions.map((q) => (
-                  <div key={q._id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px", padding: "8px 12px", background: "#f8f9fa", borderRadius: "8px", flexWrap: "wrap" }}>
-                    <span style={{ fontSize: "13px", color: q.active ? "#333" : "#aaa", textDecoration: q.active ? "none" : "line-through" }}>{q.text}</span>
+                  <div 
+                    key={q._id} 
+                    style={{ 
+                      display: "flex", 
+                      justifyContent: "space-between", 
+                      alignItems: "center", 
+                      gap: "10px", 
+                      padding: "8px 12px", 
+                      background: "#f8f9fa", 
+                      borderRadius: "8px", 
+                      flexWrap: "wrap" 
+                    }}
+                  >
+                    <span style={{ 
+                      fontSize: "13px", 
+                      color: q.active ? "#333" : "#aaa", 
+                      textDecoration: q.active ? "none" : "line-through" 
+                    }}>
+                      {q.text}
+                    </span>
                     <div style={{ display: "flex", gap: "6px" }}>
-                      <button className="btn btn-secondary" style={{ padding: "4px 8px", fontSize: "11px" }} onClick={() => toggleSurveyQuestion(q)}>{q.active ? "Turn Off" : "Turn On"}</button>
-                      <button className="btn btn-danger" style={{ padding: "4px 8px", fontSize: "11px" }} onClick={() => askConfirm(`Delete this question permanently? Past answers to it are kept, but it won't be asked again.`, () => deleteSurveyQuestion(q._id))}>🗑️</button>
+                      <button 
+                        className="btn btn-secondary" 
+                        style={{ padding: "4px 8px", fontSize: "11px" }} 
+                        onClick={() => toggleSurveyQuestion(q)}
+                      >
+                        {q.active ? "Turn Off" : "Turn On"}
+                      </button>
+                      <button 
+                        className="btn btn-danger" 
+                        style={{ padding: "4px 8px", fontSize: "11px" }} 
+                        onClick={() => askConfirm(
+                          `Delete this question permanently? Past answers to it are kept, but it won't be asked again.`, 
+                          () => deleteSurveyQuestion(q._id)
+                        )}
+                      >
+                        🗑️
+                      </button>
                     </div>
                   </div>
                 ))}
               </div>
             ) : (
-              <p style={{ color: "#999", fontSize: "13px" }}>No custom questions yet — clients will only be asked for a star rating and comments until you add one.</p>
+              <p style={{ color: "#999", fontSize: "13px" }}>
+                No custom questions yet — clients will only be asked for a star rating and comments until you add one.
+              </p>
             )}
           </div>
 
           <div style={{ marginBottom: "16px" }}>
-            <input placeholder="🔍 Search by guest or comments..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ maxWidth: "400px", marginBottom: 0 }} />
+            <input 
+              placeholder="🔍 Search by guest or comments..." 
+              value={search} 
+              onChange={(e) => setSearch(e.target.value)} 
+              style={{ maxWidth: "400px", marginBottom: 0 }} 
+            />
           </div>
           <div style={{ overflowX: "auto" }}>
             <table style={styles.table}>
               <thead>
-                <tr>{["Client", "Rating", "Comments", "Question Answers", "Submitted"].map((h) => <th key={h} style={styles.th}>{h}</th>)}</tr>
+                <tr>
+                  {["Client", "Rating", "Comments", "Question Answers", "Submitted"].map((h) => (
+                    <th key={h} style={styles.th}>{h}</th>
+                  ))}
+                </tr>
               </thead>
               <tbody>
                 {(() => {
@@ -1921,7 +2828,13 @@ export default function AdminDashboard() {
                     return ka === kb ? 0 : ka < kb ? -1 : 1;
                   });
                   if (!sorted.length) {
-                    return <tr><td colSpan="5" style={{ ...styles.td, textAlign: "center", color: "#888", padding: "40px" }}>No survey responses yet.</td></tr>;
+                    return (
+                      <tr>
+                        <td colSpan="5" style={{ ...styles.td, textAlign: "center", color: "#888", padding: "40px" }}>
+                          No survey responses yet.
+                        </td>
+                      </tr>
+                    );
                   }
                   return sorted.map((s, i) => {
                     const key = s.client?._id || s.client?.email || "unknown";
@@ -1938,14 +2851,20 @@ export default function AdminDashboard() {
                     return (
                       <tr key={s._id}>
                         {isFirstOfRun && (
-                          <td style={styles.td} rowSpan={runLength}><strong>{s.client?.name}</strong><br /><small style={{ color: "#888" }}>{s.client?.email}</small></td>
+                          <td style={styles.td} rowSpan={runLength}>
+                            <strong>{s.client?.name}</strong>
+                            <br />
+                            <small style={{ color: "#888" }}>{s.client?.email}</small>
+                          </td>
                         )}
                         <td style={styles.td}><strong>{s.rating} / 5</strong></td>
                         <td style={styles.td}>{s.comments || "No comments"}</td>
                         <td style={styles.td}>
                           {s.answers?.length ? s.answers.map((a, ai) => (
                             <div key={ai} style={{ marginBottom: "6px", fontSize: "12px" }}>
-                              <strong>{a.question}</strong><br />{a.answer || <em style={{ color: "#999" }}>No answer</em>}
+                              <strong>{a.question}</strong>
+                              <br />
+                              {a.answer || <em style={{ color: "#999" }}>No answer</em>}
                             </div>
                           )) : <span style={{ color: "#999", fontSize: "12px" }}>—</span>}
                         </td>
@@ -1960,48 +2879,51 @@ export default function AdminDashboard() {
         </>
       )}
 
+      {/* ===== CONFIRM DIALOG ===== */}
       {confirmDialog && (
-        <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", zIndex: 4000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }} onClick={() => setConfirmDialog(null)}>
-          <div style={{ background: "#fff", width: "min(420px, 100%)", borderRadius: "14px", padding: "22px" }} onClick={(e) => e.stopPropagation()}>
-            <p style={{ margin: "0 0 20px", fontSize: "14px", color: "#333" }}>{confirmDialog.message}</p>
+        <div 
+          style={{ 
+            position: "fixed", 
+            inset: 0, 
+            background: "rgba(0,0,0,.55)", 
+            zIndex: 4000, 
+            display: "flex", 
+            alignItems: "center", 
+            justifyContent: "center", 
+            padding: "20px" 
+          }} 
+          onClick={() => setConfirmDialog(null)}
+        >
+          <div 
+            style={{ 
+              background: "#fff", 
+              width: "min(420px, 100%)", 
+              borderRadius: "14px", 
+              padding: "22px" 
+            }} 
+            onClick={(e) => e.stopPropagation()}
+          >
+            <p style={{ margin: "0 0 20px", fontSize: "14px", color: "#333" }}>
+              {confirmDialog.message}
+            </p>
             <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
-              <button className="btn btn-secondary" onClick={() => setConfirmDialog(null)}>Cancel</button>
-              <button className="btn btn-primary" onClick={() => { const action = confirmDialog.onConfirm; setConfirmDialog(null); action(); }}>Confirm</button>
+              <button className="btn btn-secondary" onClick={() => setConfirmDialog(null)}>
+                Cancel
+              </button>
+              <button 
+                className="btn btn-primary" 
+                onClick={() => { 
+                  const action = confirmDialog.onConfirm; 
+                  setConfirmDialog(null); 
+                  action(); 
+                }}
+              >
+                Confirm
+              </button>
             </div>
           </div>
         </div>
       )}
-
     </div>
   );
 }
-
-// ✅ FIXED STYLES - Shows full images without cutting off
-const styles = {
-  statsGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(160px, 1fr))", gap: "16px", marginBottom: "32px" },
-  statCard: { textAlign: "center", padding: "20px", background: "#fffdf9", border: "1px solid #f0ede6" },
-  recentSection: { marginTop: "8px" },
-  table: { width: "100%", borderCollapse: "collapse", background: "#fffdf9", borderRadius: "10px", overflow: "hidden", fontSize: "14px", border: "1px solid #f0ede6" },
-  th: { background: "#1a1a2e", color: "#f0c040", padding: "12px 16px", textAlign: "left", fontSize: "13px", whiteSpace: "nowrap" },
-  td: { padding: "12px 16px", borderBottom: "1px solid #f5f0e8", verticalAlign: "middle", color: "#333" },
-  
-  // ✅ FIXED: Shows full images without cutting off
-  locationPhoto: {
-    width: "100%",
-    height: "auto",
-    aspectRatio: "16/9",
-    objectFit: "contain",
-    display: "block",
-    backgroundColor: "#f8f9fa",
-    borderRadius: "8px 8px 0 0"
-  },
-  
-  // ✅ FIXED: Better card styling
-  photoCard: {
-    overflow: "hidden",
-    borderRadius: "12px",
-    border: "1px solid #eee",
-    background: "#fff",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.06)"
-  }
-};
