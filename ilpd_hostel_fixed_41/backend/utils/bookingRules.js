@@ -30,7 +30,10 @@ const getAvailableRates = async (accommodationType = DEFAULT_ACCOMMODATION_TYPE)
   const config = getAccommodationConfig(accommodationType);
 
   // Pull prices from Category collection first (admin-managed)
-  const categories = await Category.find({ accommodationType, active: true }).select("name price").lean();
+  const categories = await Category.find({
+    active: true,
+    $or: [{ accommodationType }, { accommodationType: { $exists: false } }, { accommodationType: null }]
+  }).select("name price").lean();
   const byCategory = new Map(categories.map((c) => [c.name, Number(c.price || 0)]));
 
   // Fall back to room prices for any category not yet in Category collection

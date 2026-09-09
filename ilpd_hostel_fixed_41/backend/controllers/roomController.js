@@ -12,9 +12,13 @@ const invalidateRoomCache = () => redis.delPattern("rooms:*").then(() => Promise
 ]));
 
 const getAllowedCategories = async (accommodationType) => {
-  const cats = await Category.find({ accommodationType, active: true }).select("name").lean();
-  // Fall back to legacy names if no categories configured yet
-  return cats.length ? cats.map((c) => c.name) : ["Standard", "VIP", "VVIP"];
+  // Categories are admin-managed. Include global categories and any
+  // legacy categories belonging to the selected accommodation type.
+  const globalCats = await Category.find({
+    active: true,
+    $or: [{ accommodationType }, { accommodationType: { $exists: false } }, { accommodationType: null }]
+  }).select("name").lean();
+  return [...new Set(globalCats.map((c) => c.name))];
 };
 
 function getHostelSection(roomNumber, requestedSection) {
@@ -227,7 +231,7 @@ exports.createRoom = async (req, res) => {
     if (!address.trim()) {
       return res.status(400).json({ message: "Location (town, province, country) is required." });
     }
-    const hostelSection = accommodationType === "outside_hostel" ? getHostelSection(roomNumber, requestedSection) : undefined;
+    const hostelSection = getHostelSection(roomNumber, requestedSection);
     const allImages = images.length ? images : (imageData ? [imageData] : []);
     const imagesError = validateImages(allImages);
     if (imagesError) return res.status(400).json({ message: imagesError });
@@ -239,11 +243,8 @@ exports.createRoom = async (req, res) => {
     if (hostelSection) existingFilter.hostelSection = hostelSection;
     const existing = await Room.findOne(existingFilter);
     if (existing) {
-      const locationName = accommodationType === "outside_hostel"
-        ? "Hostel Block (Outside ILPD)"
-        : "ILPD Institution Building";
       return res.status(409).json({
-        message: `Room ${roomNumber} already exists in ${locationName}.`
+        message: `Room ${roomNumber} already exists in block "${hostelSection || "selected block"}".`
       });
     }
     const defaults = CATEGORY_DEFAULTS[category];
@@ -271,11 +272,8 @@ exports.createRoom = async (req, res) => {
     invalidateRoomCache();
   } catch (err) {
     if (err.code === 11000) {
-      const locationName = req.body.accommodationType === "ilpd_building"
-        ? "ILPD Institution Building"
-        : "Hostel Block (Outside ILPD)";
       return res.status(409).json({
-        message: `Room ${req.body.roomNumber} already exists in ${locationName}.`
+        message: `Room ${req.body.roomNumber} already exists in the selected block.`
       });
     }
     res.status(500).json({ message: err.message });

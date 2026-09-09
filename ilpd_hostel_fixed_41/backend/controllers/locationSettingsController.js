@@ -7,26 +7,9 @@ const invalidateLocationCache = () => Promise.all([
   redis.delPattern("location-blocks:*"),
 ]);
 
-const BUILT_IN_DEFAULTS = {
-  ilpd_building: "Umutakara (Main House)",
-  outside_hostel: "Hostel Block (Outside ILPD)",
-};
-
-// Seed defaults if they don't exist yet
-const ensureDefaults = async () => {
-  for (const [key, label] of Object.entries(BUILT_IN_DEFAULTS)) {
-    await LocationSettings.findOneAndUpdate(
-      { key },
-      { $setOnInsert: { key, label } },
-      { upsert: true, new: false }
-    );
-  }
-};
-
 // GET /api/location-settings — public, returns all location labels
 exports.getLocationSettings = async (req, res) => {
   try {
-    await ensureDefaults();
     const settings = await LocationSettings.find().lean();
     // Return as a map { key: label } for easy frontend consumption
     const map = {};

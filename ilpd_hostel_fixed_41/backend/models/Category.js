@@ -2,7 +2,7 @@ const mongoose = require("mongoose");
 
 const categorySchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
-  accommodationType: { type: String, enum: ["outside_hostel", "ilpd_building"], required: true },
+  accommodationType: { type: String, enum: ["outside_hostel", "ilpd_building"], required: false },
   price: { type: Number, required: true, min: 1 },
   description: { type: String, default: "", trim: true },
   capacity: { type: Number, default: 2, min: 1 },

@@ -23,16 +23,14 @@ const ROOM_IMAGES = {
 };
 
 const fmt = (n) => `${Number(n || 0).toLocaleString()} RWF`;
-const LOCATIONS = [
-  { value: "ilpd_building", defaultLabel: "Umutakara (Main House)", period: "night", suffix: "/night" },
-  { value: "outside_hostel", defaultLabel: "Hostel Block (Outside ILPD Building)", period: "month", suffix: "/month" },
-];
 
 export default function Rooms() {
   const [booking, setBooking] = useState(null);
   const [showTerms, setShowTerms] = useState(null);
   const [termsAnswer, setTermsAnswer] = useState("");
-  const [form, setForm] = useState({ checkIn: "", checkOut: "", accommodationType: "ilpd_building", numberOfOccupants: 1, occupantNames: [""] });
+  const [form, setForm] = useState({ checkIn: "", checkOut: "", accommodationType: "", numberOfOccupants: 1, occupantNames: [""] });
+  const [blocks, setBlocks] = useState([]);
+  const [selectedBlockName, setSelectedBlockName] = useState("");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
   const [policy, setPolicy] = useState({ cancellationDeadlineDays: 7 });
@@ -40,7 +38,6 @@ export default function Rooms() {
   const [roomSections, setRoomSections] = useState({});
   const [locationAddress, setLocationAddress] = useState("");
   const [roomsLoading, setRoomsLoading] = useState(false);
-  const [locationLabels, setLocationLabels] = useState({ ilpd_building: "Umutakara (Main House)", outside_hostel: "Hostel Block (Outside ILPD Building)" });
 
   const [rates, setRates] = useState([]);
   const [ratesLoading, setRatesLoading] = useState(false);
@@ -60,7 +57,12 @@ export default function Rooms() {
     return Math.max(1, months);
   };
 
-  const selectedLocation = LOCATIONS.find((x) => x.value === form.accommodationType) || LOCATIONS[0];
+  const selectedBlock = blocks.find((b) => b.name === selectedBlockName) || blocks.find((b) => b.accommodationType === form.accommodationType) || null;
+  const selectedLocation = {
+    label: selectedBlock?.name || "No block selected",
+    period: selectedBlock?.accommodationType === "ilpd_building" ? "night" : "month",
+    suffix: selectedBlock?.accommodationType === "ilpd_building" ? "/night" : "/month"
+  };
   // Categories/prices are whatever the admin has actually configured for this
   // location right now — nothing hardcoded. A category only appears here once
   // the admin has created at least one room of that kind with a price.
@@ -79,15 +81,19 @@ export default function Rooms() {
 
   React.useEffect(() => {
     API.get("/bookings/policy").then(({ data }) => setPolicy(data)).catch(() => {});
-    API.get("/location-settings").then(({ data }) => {
-      const labels = {};
-      Object.entries(data).forEach(([k, v]) => { labels[k] = v.label || v; });
-      setLocationLabels((prev) => ({ ...prev, ...labels }));
-    }).catch(() => {});
+    API.get("/hostel-structure/blocks").then(({ data }) => {
+      const activeBlocks = (data || []).filter((b) => b.active !== false);
+      setBlocks(activeBlocks);
+      if (activeBlocks.length) {
+        setSelectedBlockName(activeBlocks[0].name);
+        setForm((f) => ({ ...f, accommodationType: activeBlocks[0].accommodationType }));
+      }
+    }).catch(() => setBlocks([]));
   }, []);
 
   React.useEffect(() => {
     let active = true;
+    if (!form.accommodationType) { setRates([]); setRatesLoading(false); return () => {}; }
     setRatesLoading(true);
     API.get("/rooms/rates", { params: { accommodationType: form.accommodationType } })
       .then(({ data }) => { if (active) setRates(data || []); })
@@ -98,6 +104,7 @@ export default function Rooms() {
 
   React.useEffect(() => {
     let active = true;
+    if (!form.accommodationType) { setRoomExamples({}); setRoomSections({}); setLocationAddress(""); setRoomsLoading(false); return () => {}; }
     setRoomsLoading(true);
     API.get("/rooms", { params: { accommodationType: form.accommodationType } })
       .then(({ data }) => {
@@ -158,23 +165,34 @@ export default function Rooms() {
 
       <div className="container" style={{ padding: "40px 20px" }}>
         <div style={styles.infoBox}>
-          ℹ️ <strong>Choose your accommodation location:</strong> The Hostel Block is charged monthly. Rooms inside the ILPD Institution Building are charged per night.
+          ℹ️ <strong>Choose an accommodation block:</strong> The available blocks below are managed by the hostel administrator.
         </div>
 
-        <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "24px" }}>
-          {LOCATIONS.map((loc) => (
-            <button key={loc.value} type="button" onClick={() => setForm((f) => ({ ...f, accommodationType: loc.value }))} style={{ ...styles.locationBtn, ...(form.accommodationType === loc.value ? styles.locationBtnActive : {}) }}>
-              {loc.value === "outside_hostel" ? "🏨" : "🏛️"} {locationLabels[loc.value] || loc.defaultLabel} · {loc.suffix.slice(1)}
-            </button>
-          ))}
-        </div>
+        {blocks.length > 0 ? (
+          <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", marginBottom: "24px" }}>
+            {blocks.map((block) => (
+              <button key={block._id} type="button"
+                onClick={() => {
+                  setSelectedBlockName(block.name);
+                  setForm((f) => ({ ...f, accommodationType: block.accommodationType }));
+                }}
+                style={{ ...styles.locationBtn, ...(selectedBlockName === block.name ? styles.locationBtnActive : {}) }}>
+                🏨 {block.name} · {block.accommodationType === "ilpd_building" ? "night" : "month"}
+              </button>
+            ))}
+          </div>
+        ) : (
+          <div style={{ ...styles.infoBox, background: "#fff8e6" }}>
+            No accommodation blocks have been configured yet. Please contact the administrator.
+          </div>
+        )}
 
         <div style={{ margin: "0 0 16px", color: "#666", fontSize: "13px" }}>
           {roomsLoading || ratesLoading ? "Loading rooms..." : "Photos show the selected accommodation location. Room numbers are assigned by the admin after payment."}
         </div>
         {!ratesLoading && visibleCategories.length === 0 && (
           <div style={{ ...styles.infoBox, background: "#fff8e6" }}>
-            No rooms have been configured for {selectedLocation.label} yet. Please check back soon or choose the other location.
+            No rooms have been configured for {selectedLocation.label} yet. Please check back soon or choose another configured block.
           </div>
         )}
         <div style={styles.grid}>
@@ -193,7 +211,7 @@ export default function Rooms() {
                 )}
                 <span style={{ ...styles.cardTag, background: cat.color }}>{cat.tag}</span>
                 <span style={{ position: "absolute", top: "10px", left: "10px", background: "rgba(0,0,0,.65)", color: "#fff", fontSize: "11px", fontWeight: "700", padding: "4px 9px", borderRadius: "999px" }}>
-                  {form.accommodationType === "ilpd_building" ? "🏛️" : "🏨"} {locationLabels[form.accommodationType]}
+                  {form.accommodationType === "ilpd_building" ? "🏛️" : "🏨"} {selectedLocation.label}
                 </span>
                 {locationAddress && (
                   <span style={{ position: "absolute", bottom: "0", left: "0", right: "0", background: "rgba(0,0,0,.65)", color: "#fff", fontSize: "12px", fontWeight: "600", padding: "6px 10px" }}>
@@ -208,7 +226,7 @@ export default function Rooms() {
                 </div>
                 <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", margin: "8px 0" }}>
                   <span style={{ fontSize: "12px", fontWeight: "700", background: "#f0f0f0", color: "#333", padding: "4px 10px", borderRadius: "999px" }}>
-                    📍 {locationLabels[form.accommodationType]}
+                    📍 {selectedLocation.label}
                   </span>
                   {roomSections[cat.name]?.length > 0 && (
                     <span style={{ fontSize: "12px", fontWeight: "700", background: "#f3f0ff", color: "#553c9a", padding: "4px 10px", borderRadius: "999px" }}>

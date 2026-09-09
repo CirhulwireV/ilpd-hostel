@@ -21,12 +21,17 @@ const STATIC_IMAGES = {
 
 export default function Home({ user }) {
   const [rooms, setRooms] = useState([]);
+  const [blocks, setBlocks] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    API.get("/rooms")
-      .then(({ data }) => {
-        setRooms(data);
+    Promise.all([
+      API.get("/rooms"),
+      API.get("/hostel-structure/blocks")
+    ])
+      .then(([roomsRes, blocksRes]) => {
+        setRooms(roomsRes.data || []);
+        setBlocks((blocksRes.data || []).filter((b) => b.active !== false));
         setLoading(false);
       })
       .catch(() => setLoading(false));
@@ -100,7 +105,7 @@ export default function Home({ user }) {
           </div>
           <div style={styles.heroStats}>
             {[
-              [rooms.length || "128", "Rooms"],
+              [rooms.length, "Rooms"],
               ["24/7", "Service"],
               ["0min", "Queue Time"],
             ].map(([val, label]) => (
@@ -167,128 +172,65 @@ export default function Home({ user }) {
         </div>
       </div>
 
-      {/* ROOMS */}
+      {/* ROOMS — fully driven by admin-configured blocks and rooms */}
       <div id="rooms" style={styles.section}>
         <div className="container">
           <div style={{ textAlign: "center" }}>
             <div style={styles.sectionLabel}>Accommodation</div>
             <h2 style={{ ...styles.sectionTitle, textAlign: "center" }}>Choose Your Accommodation</h2>
-            <p style={styles.sectionSub}>Browse our available rooms. Photos show actual rooms uploaded by our team.</p>
+            <p style={styles.sectionSub}>Browse the accommodation blocks and room categories configured by the administrator.</p>
           </div>
 
-          {/* ILPD Building — Main House */}
-          {rooms.filter(r => r.accommodationType === "ilpd_building").length > 0 && (
-            <div style={{ ...styles.roomLocation, marginTop: "28px" }}>
-              <div style={styles.locationHeader}>
-                <div>
-                  <h3 style={styles.locationTitle}>🏛️ ILPD Building — Main House</h3>
-                  <p style={styles.locationSub}>
-                    {getTotalRoomsByType("ilpd_building")} rooms · billed per night · {getCategories("ilpd_building").join(", ")}
-                  </p>
-                </div>
-                <Link to="/rooms"><button style={styles.primaryBtn}>View Main House Rooms →</button></Link>
-              </div>
-              <div style={styles.photoGrid}>
-                {getCategories("ilpd_building").map((category) => {
-                  const count = getRoomCount(category, "ilpd_building");
-                  const price = getRoomPrice(category, "ilpd_building");
-                  const image = getRoomImage(category, "ilpd_building");
-                  
-                  return (
-                    <div key={category} style={styles.photoCard}>
-                      <div style={styles.imageWrapper}>
-                        <img 
-                          src={image} 
-                          alt={`${category} room in ILPD Main House`} 
-                          style={styles.locationPhoto}
-                          onError={(e) => {
-                            const fallback = STATIC_IMAGES[`${category.toLowerCase()}-ilpd`] || `/rooms/${category.toLowerCase()}-ilpd.jpg`;
-                            e.target.src = fallback;
-                          }}
-                        />
-                      </div>
-                      <div style={styles.photoBody}>
-                        <strong>{category}</strong>
-                        <span>{count} rooms · {price.toLocaleString()} RWF/night</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+          {blocks.length === 0 ? (
+            <div style={{ ...styles.infoBox, marginTop: "28px" }}>
+              No accommodation blocks have been configured yet.
             </div>
-          )}
+          ) : blocks.map((block) => {
+            const blockRooms = rooms.filter((r) =>
+              r.hostelSection === block.name || r.accommodationType === block.accommodationType
+            );
+            if (!blockRooms.length) return null;
+            const categoryNames = [...new Set(blockRooms.map((r) => r.category).filter(Boolean))];
 
-          {/* Outside Hostel Block */}
-          {rooms.filter(r => r.accommodationType === "outside_hostel").length > 0 && (
-            <div style={{ ...styles.roomLocation, marginTop: "28px" }}>
-              <div style={styles.locationHeader}>
-                <div>
-                  <h3 style={styles.locationTitle}>🏨 Outside Hostel Block</h3>
-                  <p style={styles.locationSub}>
-                    {getTotalRoomsByType("outside_hostel")} rooms · {getCategories("outside_hostel").join(", ")}
-                  </p>
-                </div>
-                <Link to="/rooms"><button style={styles.primaryBtn}>View Outside Block Rooms →</button></Link>
-              </div>
-              <div style={styles.photoGrid}>
-                {getCategories("outside_hostel").map((category) => {
-                  const count = getRoomCount(category, "outside_hostel");
-                  const price = getRoomPrice(category, "outside_hostel");
-                  const image = getRoomImage(category, "outside_hostel");
-                  
-                  return (
-                    <div key={category} style={styles.photoCard}>
-                      <div style={styles.imageWrapper}>
-                        <img 
-                          src={image} 
-                          alt={`${category} room in Outside Hostel Block`} 
-                          style={styles.locationPhoto}
-                          onError={(e) => {
-                            const fallback = STATIC_IMAGES[`${category.toLowerCase()}-outside`] || `/rooms/${category.toLowerCase()}-outside.jpg`;
-                            e.target.src = fallback;
-                          }}
-                        />
-                      </div>
-                      <div style={styles.photoBody}>
-                        <strong>{category}</strong>
-                        <span>{count} rooms · {price.toLocaleString()} RWF/month</span>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-
-          {/* If no rooms exist */}
-          {rooms.length === 0 && (
-            <div style={{ ...styles.roomLocation, marginTop: "28px" }}>
-              <div style={styles.locationHeader}>
-                <div>
-                  <h3 style={styles.locationTitle}>🏛️ ILPD Building — Main House</h3>
-                  <p style={styles.locationSub}>88 rooms · billed per night · Standard, VIP and VVIP</p>
-                </div>
-                <Link to="/rooms"><button style={styles.primaryBtn}>View Main House Rooms →</button></Link>
-              </div>
-              <div style={styles.photoGrid}>
-                {[
-                  { name: "Standard", img: "/rooms/standard-ilpd.jpg", detail: "54 rooms · 35,000 RWF/night" },
-                  { name: "VIP", img: "/rooms/vip-ilpd.jpg", detail: "32 rooms · 50,000 RWF/night" },
-                  { name: "VVIP", img: "/rooms/vvip-ilpd.jpg", detail: "2 rooms · 100,000 RWF/night" },
-                ].map(({ name, img, detail }) => (
-                  <div key={name} style={styles.photoCard}>
-                    <div style={styles.imageWrapper}>
-                      <img src={img} alt={`${name} room`} style={styles.locationPhoto} />
-                    </div>
-                    <div style={styles.photoBody}>
-                      <strong>{name}</strong>
-                      <span>{detail}</span>
-                    </div>
+            return (
+              <div key={block._id} style={{ ...styles.roomLocation, marginTop: "28px" }}>
+                <div style={styles.locationHeader}>
+                  <div>
+                    <h3 style={styles.locationTitle}>🏨 {block.name}</h3>
+                    <p style={styles.locationSub}>
+                      {blockRooms.length} rooms · {block.accommodationType === "ilpd_building" ? "billed per night" : "billed per month"} · {categoryNames.join(", ")}
+                    </p>
                   </div>
-                ))}
+                  <Link to="/rooms"><button style={styles.primaryBtn}>View Rooms →</button></Link>
+                </div>
+                <div style={styles.photoGrid}>
+                  {categoryNames.map((category) => {
+                    const room = blockRooms.find((r) => r.category === category);
+                    const image = room?.images?.[0] || room?.imageData || "";
+                    const price = room?.price || 0;
+                    return (
+                      <div key={category} style={styles.photoCard}>
+                        <div style={styles.imageWrapper}>
+                          {image ? (
+                            <img src={image} alt={`${category} room in ${block.name}`} style={styles.locationPhoto} />
+                          ) : (
+                            <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "42px", color: "#bbb" }}>🏨</div>
+                          )}
+                          <span style={{ ...styles.cardTag, background: "#b8860b" }}>{category}</span>
+                        </div>
+                        <div style={{ padding: "14px" }}>
+                          <h4 style={{ margin: "0 0 6px" }}>{category}</h4>
+                          <p style={{ color: "#666", fontSize: "13px", margin: 0 }}>
+                            {blockRooms.filter((r) => r.category === category).length} rooms · {Number(price).toLocaleString()} RWF
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
               </div>
-            </div>
-          )}
+            );
+          })}
         </div>
       </div>
 

@@ -25,8 +25,8 @@ exports.createBlock = async (req, res) => {
   try {
     const { name, accommodationType, usesCategories = true, description = "" } = req.body;
     if (!name?.trim()) return res.status(400).json({ message: "Block name is required." });
-    if (!["outside_hostel", "ilpd_building"].includes(accommodationType))
-      return res.status(400).json({ message: "Invalid accommodation type." });
+    // Categories are global and are no longer tied to a fixed location.
+    // Keep accommodationType only as an optional legacy field for old records.
     const block = await Block.create({ name: name.trim(), accommodationType, usesCategories, description: description.trim() });
     invalidateBlockCache();
     res.status(201).json(block);
@@ -138,7 +138,7 @@ exports.createCategory = async (req, res) => {
     if (!Number.isFinite(numericPrice) || numericPrice <= 0)
       return res.status(400).json({ message: "A price greater than 0 is required." });
     const category = await Category.create({
-      name: name.trim(), accommodationType, price: numericPrice,
+      name: name.trim(), ...(accommodationType ? { accommodationType } : {}), price: numericPrice,
       description: description.trim(), capacity: Number(capacity) || 2, images,
     });
     invalidateCategoryCache();
@@ -177,7 +177,7 @@ exports.deleteCategory = async (req, res) => {
   try {
     const category = await Category.findById(req.params.id);
     if (!category) return res.status(404).json({ message: "Category not found." });
-    const roomCount = await Room.countDocuments({ category: category.name, accommodationType: category.accommodationType });
+    const roomCount = await Room.countDocuments({ category: category.name });
     if (roomCount > 0)
       return res.status(400).json({ message: `Cannot delete category "${category.name}" — it has ${roomCount} room(s). Deactivate it instead.` });
     await Category.findByIdAndDelete(req.params.id);
