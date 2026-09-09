@@ -1,0 +1,23 @@
+# Dependencies
+node_modules/
+
+# Environment variables
+.env
+.env.local
+.env.*.local
+*.env
+
+# Production builds
+build/
+dist/
+
+# Logs & temp files
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Uploaded test media (keeps directory structure)
+backend/uploads/*
+public/uploads/*
+!.gitkeep
