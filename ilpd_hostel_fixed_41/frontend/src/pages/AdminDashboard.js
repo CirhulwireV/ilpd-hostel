@@ -49,9 +49,6 @@ export default function AdminDashboard() {
   const [concerns, setConcerns] = useState([]);
   const [surveys, setSurveys] = useState([]);
   const [concernRoomFilter, setConcernRoomFilter] = useState("");
-  const [locationLabels, setLocationLabels] = useState({ ilpd_building: "Umutakara (Main House)", outside_hostel: "Hostel Block (Outside ILPD)" });
-  const [editingLocationKey, setEditingLocationKey] = useState(null);
-  const [editingLocationLabel, setEditingLocationLabel] = useState("");
   const [newBlockName, setNewBlockName] = useState("");
   const [newBlockType, setNewBlockType] = useState("outside_hostel");
   const [blockMsg, setBlockMsg] = useState("");
@@ -70,7 +67,7 @@ export default function AdminDashboard() {
   const [editingSubBlock, setEditingSubBlock] = useState(null);
   const [editingSubBlockParent, setEditingSubBlockParent] = useState("");
   const [subBlockName, setSubBlockName] = useState("");
-  const [catForm, setCatForm] = useState({ name: "", accommodationType: "outside_hostel", price: "", description: "", capacity: 2 });
+  const [catForm, setCatForm] = useState({ name: "", price: "", description: "", capacity: 2 });
   const [editingCat, setEditingCat] = useState(null);
   const [editingRoom, setEditingRoom] = useState(null);
   const [editRoomForm, setEditRoomForm] = useState({});
@@ -127,7 +124,7 @@ export default function AdminDashboard() {
   const [allocateRoomId, setAllocateRoomId] = useState([]);
   const [allocationRooms, setAllocationRooms] = useState([]);
   const [showAddRoom, setShowAddRoom] = useState(false);
-  const [newRoom, setNewRoom] = useState({ roomNumber: "", category: "Standard", accommodationType: "outside_hostel", hostelSection: "", price: "", address: "Nyanza, Southern Province, Rwanda", images: [], imageData: "", imageName: "" });
+  const [newRoom, setNewRoom] = useState({ roomNumber: "", category: "", accommodationType: "outside_hostel", hostelSection: "", price: "", address: "Nyanza, Southern Province, Rwanda", images: [], imageData: "", imageName: "" });
   const [addRoomError, setAddRoomError] = useState("");
   const [addingRoom, setAddingRoom] = useState(false);
   const [bulkMode, setBulkMode] = useState(false);
@@ -150,11 +147,6 @@ export default function AdminDashboard() {
     }).catch((err) => console.error("Error loading blocks:", err));
     API.get("/hostel-structure/categories?activeOnly=false").then(({ data }) => setCategories(data)).catch(() => {});
     API.get("/surveys/questions/all").then(({ data }) => setSurveyQuestions(data)).catch(() => {});
-    API.get("/location-settings").then(({ data }) => {
-      const labels = {};
-      Object.entries(data).forEach(([k, v]) => { labels[k] = v.label || v; });
-      setLocationLabels((prev) => ({ ...prev, ...labels }));
-    }).catch(() => {});
   }, []);
 
   useEffect(() => {
@@ -339,18 +331,6 @@ export default function AdminDashboard() {
     }
   };
 
-  const saveLocationLabel = async (key) => {
-    if (!editingLocationLabel.trim()) return;
-    try {
-      await API.put(`/location-settings/${encodeURIComponent(key)}`, { label: editingLocationLabel.trim() });
-      setLocationLabels((prev) => ({ ...prev, [key]: editingLocationLabel.trim() }));
-      setEditingLocationKey(null);
-      setMsg(`Location name updated to "${editingLocationLabel.trim()}".`);
-    } catch (err) {
-      setMsg(err.response?.data?.message || "Could not update location name.");
-    }
-  };
-
   const checkRoomHealth = async (dryRun) => {
     setHealthChecking(true);
     try {
@@ -450,6 +430,14 @@ export default function AdminDashboard() {
       setAddRoomError("Room number is required.");
       return;
     }
+    if (!newRoom.hostelSection) {
+      setAddRoomError("Select a block.");
+      return;
+    }
+    if (!newRoom.category) {
+      setAddRoomError("Create and select a category first.");
+      return;
+    }
     if (!newRoom.price || Number(newRoom.price) <= 0) {
       setAddRoomError("Enter a price greater than 0.");
       return;
@@ -473,7 +461,7 @@ export default function AdminDashboard() {
       setRooms((prev) => [...prev, data].sort((a, b) => a.roomNumber.localeCompare(b.roomNumber)));
       setMsg(`Room ${data.roomNumber} created successfully.`);
       API.get("/rooms/blocks").then(({ data: b }) => setKnownBlocks(b)).catch(() => {});
-      setNewRoom({ roomNumber: "", category: "Standard", accommodationType: "outside_hostel", hostelSection: "", price: "", address: "Nyanza, Southern Province, Rwanda", images: [], imageData: "", imageName: "" });
+      setNewRoom({ roomNumber: "", category: "", accommodationType: "outside_hostel", hostelSection: "", price: "", address: "Nyanza, Southern Province, Rwanda", images: [], imageData: "", imageName: "" });
       setShowAddRoom(false);
     } catch (err) {
       setAddRoomError(err.response?.data?.message || "Could not create room.");
@@ -491,6 +479,14 @@ export default function AdminDashboard() {
     }
     if (!newRoom.address.trim()) {
       setAddRoomError("Enter the location.");
+      return;
+    }
+    if (!newRoom.hostelSection) {
+      setAddRoomError("Select a block.");
+      return;
+    }
+    if (!newRoom.category) {
+      setAddRoomError("Create and select a category first.");
       return;
     }
     setBulkCreating(true);
@@ -523,7 +519,7 @@ export default function AdminDashboard() {
       setBulkRoomNumbers("");
       setBulkStartNumber("");
       setBulkCount("5");
-      setNewRoom({ roomNumber: "", category: "Standard", accommodationType: "outside_hostel", hostelSection: "", price: "", address: "Nyanza, Southern Province, Rwanda", images: [], imageData: "", imageName: "" });
+      setNewRoom({ roomNumber: "", category: "", accommodationType: "outside_hostel", hostelSection: "", price: "", address: "Nyanza, Southern Province, Rwanda", images: [], imageData: "", imageName: "" });
       setShowAddRoom(false);
       setBulkMode(false);
     } catch (err) {
@@ -534,6 +530,22 @@ export default function AdminDashboard() {
   };
 
   // Hostel Structure Functions
+  useEffect(() => {
+    if (!blocks.length) return;
+    setNewRoom((r) => {
+      const currentBlock = blocks.find((b) => b.name === r.hostelSection);
+      const block = currentBlock || blocks.find((b) => b.active !== false);
+      const activeCategories = categories.filter((c) => c.active);
+      const categoryStillExists = activeCategories.some((c) => c.name === r.category);
+      return {
+        ...r,
+        hostelSection: block?.name || r.hostelSection,
+        accommodationType: block?.accommodationType || r.accommodationType,
+        category: categoryStillExists ? r.category : (activeCategories[0]?.name || "")
+      };
+    });
+  }, [blocks, categories]);
+
   const refreshStructure = async () => {
     try {
       setStructureMsg("");
@@ -549,31 +561,7 @@ export default function AdminDashboard() {
       
       console.log("Fetched blocks:", fetchedBlocks);
       
-      if (fetchedBlocks.length === 0) {
-        console.log("No blocks found, creating default blocks...");
-        try {
-          await API.post("/hostel-structure/blocks", { 
-            name: "Hostel Block (Outside)", 
-            accommodationType: "outside_hostel", 
-            usesCategories: true, 
-            description: "Main outside hostel block" 
-          });
-          await API.post("/hostel-structure/blocks", { 
-            name: "Umutakara (Main House)", 
-            accommodationType: "ilpd_building", 
-            usesCategories: true, 
-            description: "Main ILPD building" 
-          });
-          const { data: newBlocks } = await API.get("/hostel-structure/blocks?activeOnly=false");
-          setBlocks(newBlocks);
-          setStructureMsg("Default blocks created successfully.");
-        } catch (err) {
-          console.error("Error creating default blocks:", err);
-        }
-      } else {
-        setBlocks(fetchedBlocks);
-      }
-      
+      setBlocks(fetchedBlocks);
       setCategories(fetchedCategories);
       
     } catch (err) {
@@ -727,7 +715,7 @@ export default function AdminDashboard() {
         setStructureMsg(`Category "${data.name}" created.`);
       }
       setEditingCat(null);
-      setCatForm({ name: "", accommodationType: "outside_hostel", price: "", description: "", capacity: 2 });
+      setCatForm({ name: "", price: "", description: "", capacity: 2 });
     } catch (err) { setStructureError(err.response?.data?.message || "Could not save category."); }
   };
 
@@ -1226,7 +1214,7 @@ export default function AdminDashboard() {
             return (
               <>
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "18px" }}>
-                  {SUB_TABS.filter((s) => s.key !== "Cancelled / Rejected" || s.list.length > 0).map((s) => (
+                  {SUB_TABS.map((s) => (
                     <button
                       key={s.key}
                       className={`btn ${bookingSubTab === s.key ? "btn-primary" : "btn-outline"}`}
@@ -1322,7 +1310,7 @@ export default function AdminDashboard() {
                   {blockMsg && <span style={{ fontSize: "12px", color: "#276749" }}>✅ {blockMsg}</span>}
                 </div>
                 <p style={{ fontSize: "12px", color: "#666", marginTop: "8px" }}>
-                  💡 Blocks are building sections (e.g., Wing A, East Wing). Categories are room types (e.g., Standard, VIP).
+                  💡 Blocks are building sections. Categories are room types.
                 </p>
               </div>
 
@@ -1498,24 +1486,18 @@ export default function AdminDashboard() {
                   )}
                 </div>
                 <p style={{ fontSize: "12px", color: "#666", margin: "8px 0 0" }}>
-                  💡 Create a Subblock and assign it to its parent Block. Existing Subblocks can be edited, activated or deactivated below.
+                  💡 Create a Subblock and assign it to its parent Block.
                 </p>
               </div>
 
               {/* Categories */}
               <div>
                 <h4 style={{ margin: "0 0 12px", fontSize: "14px" }}>🏷️ Categories</h4>
+                <p style={{ margin: "0 0 12px", color: "#666", fontSize: "12px" }}>Categories are global room types. Assign them to rooms when creating or editing a room.</p>
                 <div style={{ display: "flex", gap: "8px", flexWrap: "wrap", marginBottom: "14px", alignItems: "flex-end" }}>
                   <div>
                     <label style={{ fontSize: "12px", display: "block", marginBottom: "3px" }}>Name *</label>
                     <input value={catForm.name} onChange={(e) => setCatForm((f) => ({ ...f, name: e.target.value }))} placeholder="e.g. Standard" style={{ width: "140px", marginBottom: 0 }} />
-                  </div>
-                  <div>
-                    <label style={{ fontSize: "12px", display: "block", marginBottom: "3px" }}>Location *</label>
-                    <select value={catForm.accommodationType} onChange={(e) => setCatForm((f) => ({ ...f, accommodationType: e.target.value }))} style={{ width: "200px", marginBottom: 0 }}>
-                      <option value="outside_hostel">Hostel Block (Outside ILPD)</option>
-                      <option value="ilpd_building">Umutakara (Main House)</option>
-                    </select>
                   </div>
                   <div>
                     <label style={{ fontSize: "12px", display: "block", marginBottom: "3px" }}>Price (RWF) *</label>
@@ -1526,7 +1508,7 @@ export default function AdminDashboard() {
                     <input type="number" min="1" value={catForm.capacity} onChange={(e) => setCatForm((f) => ({ ...f, capacity: e.target.value }))} style={{ width: "80px", marginBottom: 0 }} />
                   </div>
                   <button className="btn btn-primary" onClick={saveCat}>{editingCat ? "Update" : "+ Add"}</button>
-                  {editingCat && <button className="btn btn-secondary" onClick={() => { setEditingCat(null); setCatForm({ name: "", accommodationType: "outside_hostel", price: "", description: "", capacity: 2 }); }}>✕</button>}
+                  {editingCat && <button className="btn btn-secondary" onClick={() => { setEditingCat(null); setCatForm({ name: "", price: "", description: "", capacity: 2 }); }}>✕</button>}
                 </div>
 
                 {categories.length === 0 && <p style={{ color: "#999", fontSize: "13px" }}>No categories yet.</p>}
@@ -1535,7 +1517,7 @@ export default function AdminDashboard() {
                     <div key={cat._id} style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: "10px", flexWrap: "wrap", padding: "10px 12px", border: "1px solid #e2e8f0", borderRadius: "8px", opacity: cat.active ? 1 : 0.55 }}>
                       <div><strong>{cat.name}</strong><span style={{ marginLeft: "10px", color: "#666", fontSize: "12px" }}>{Number(cat.price).toLocaleString()} RWF · capacity {cat.capacity}</span><span style={{ marginLeft: "8px", fontSize: "11px", color: cat.active ? "#276749" : "#9b2c2c" }}>{cat.active ? "Active" : "Inactive"}</span></div>
                       <div style={{ display: "flex", gap: "5px" }}>
-                        <button className="btn btn-secondary" style={{ padding: "4px 8px", fontSize: "11px" }} onClick={() => { setEditingCat(cat); setCatForm({ name: cat.name, accommodationType: cat.accommodationType, price: cat.price, description: cat.description || "", capacity: cat.capacity || 2 }); }}>✎ Edit</button>
+                        <button className="btn btn-secondary" style={{ padding: "4px 8px", fontSize: "11px" }} onClick={() => { setEditingCat(cat); setCatForm({ name: cat.name, price: cat.price, description: cat.description || "", capacity: cat.capacity || 2 }); }}>✎ Edit</button>
                         <button className="btn btn-secondary" style={{ padding: "4px 8px", fontSize: "11px" }} onClick={() => toggleCatActive(cat)}>{cat.active ? "Deactivate" : "Activate"}</button>
                       </div>
                     </div>
@@ -1566,7 +1548,7 @@ export default function AdminDashboard() {
             <form onSubmit={createRoom} style={{ marginBottom: "20px", padding: "18px", background: "#fffaf0", border: "1px solid #f0e0c0", borderRadius: "12px" }}>
               <h3 style={{ margin: "0 0 6px" }}>{bulkMode ? "Add multiple rooms" : "Add a room"}</h3>
               <p style={{ margin: "0 0 16px", color: "#666", fontSize: "13px" }}>
-                Choose the building and set the price yourself. Rooms in the ILPD Building can be Standard, VIP, or VVIP; rooms in the Outside Hostel Block use one standard tariff.
+                Choose a Block and Category to add rooms.
               </p>
               <div style={{ marginBottom: "14px", display: "flex", gap: "8px" }}>
                 <button type="button" className={bulkMode ? "btn btn-secondary" : "btn btn-primary"} onClick={() => { setBulkMode(false); setAddRoomError(""); }}>Single Room</button>
@@ -1575,9 +1557,24 @@ export default function AdminDashboard() {
               <div style={{ display: "flex", gap: "12px", flexWrap: "wrap", alignItems: "flex-end" }}>
                 <div>
                   <label style={{ display: "block", fontSize: "12px", marginBottom: "4px" }}>Block *</label>
-                  <select value={newRoom.accommodationType} onChange={(e) => setNewRoom((r) => ({ ...r, accommodationType: e.target.value, category: e.target.value === "outside_hostel" ? "Standard" : r.category }))} style={{ width: "250px", marginBottom: 0 }}>
-                    <option value="outside_hostel">Hostel Block (Outside ILPD) — billed/month</option>
-                    <option value="ilpd_building">Umutakara (Main House) — billed/night</option>
+                  <select
+                    value={newRoom.hostelSection || ""}
+                    onChange={(e) => {
+                      const block = blocks.find((b) => b.name === e.target.value);
+                      setNewRoom((r) => ({
+                        ...r,
+                        hostelSection: e.target.value,
+                        accommodationType: block?.accommodationType || r.accommodationType,
+                        category: r.category
+                      }));
+                    }}
+                    style={{ width: "250px", marginBottom: 0 }}
+                    disabled={!blocks.length}
+                  >
+                    <option value="">{blocks.length ? "-- Select a Block --" : "No blocks configured"}</option>
+                    {blocks.filter((b) => b.active !== false).map((b) => (
+                      <option key={b._id} value={b.name}>{b.name}</option>
+                    ))}
                   </select>
                 </div>
                 <div>
@@ -1607,10 +1604,9 @@ export default function AdminDashboard() {
                   <div>
                     <label style={{ display: "block", fontSize: "12px", marginBottom: "4px" }}>Category *</label>
                     <select value={newRoom.category} onChange={(e) => setNewRoom((r) => ({ ...r, category: e.target.value }))} style={{ width: "130px", marginBottom: 0 }}>
-                      {(categories.filter((c) => c.active && c.accommodationType === "ilpd_building").length
-                        ? categories.filter((c) => c.active && c.accommodationType === "ilpd_building")
-                        : [{ name: "Standard" }, { name: "VIP" }, { name: "VVIP" }]
-                      ).map((c) => <option key={c.name} value={c.name}>{c.name}</option>)}
+                      {categories.filter((c) => c.active).map((c) => (
+                        <option key={c._id || c.name} value={c.name}>{c.name}</option>
+                      ))}
                     </select>
                   </div>
                 )}
@@ -1718,11 +1714,10 @@ export default function AdminDashboard() {
                 <label style={{ fontSize: "12px", display: "block", marginBottom: "3px" }}>Category</label>
                 <input list="edit-room-categories" value={editRoomForm.category || ""} onChange={(e) => setEditRoomForm((f) => ({ ...f, category: e.target.value }))} style={{ width: "100%", marginBottom: 0 }} />
                 <datalist id="edit-room-categories">
-                  {categories.filter((c) => c.active && c.accommodationType === editingRoom.accommodationType).map((c) => <option key={c._id} value={c.name} />)}
-                  {["Standard", "VIP", "VVIP"].map((c) => <option key={c} value={c} />)}
+                  {categories.filter((c) => c.active).map((c) => <option key={c._id} value={c.name} />)}
                 </datalist>
               </div>
-              {editingRoom.accommodationType === "outside_hostel" && (
+              {knownBlocks.length > 0 && (
                 <div>
                   <label style={{ fontSize: "12px", display: "block", marginBottom: "3px" }}>Block</label>
                   <input list="edit-room-blocks" value={editRoomForm.hostelSection || ""} onChange={(e) => setEditRoomForm((f) => ({ ...f, hostelSection: e.target.value }))} style={{ width: "100%", marginBottom: 0 }} />
