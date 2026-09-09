@@ -8,7 +8,16 @@ const { apiLimiter } = require("./middleware/rateLimiter");
 const app = express();
 
 app.use(helmet());
-app.use(cors({ origin: process.env.CLIENT_URL || "http://localhost:3000", credentials: true }));
+
+// ✅ FIXED CORS - Allow Vercel frontend and Render backend
+app.use(cors({
+  origin: [
+    'https://ilpd-hostel-app.vercel.app',
+    'https://ilpd-hostel-1.onrender.com',
+    'http://localhost:3000'
+  ],
+  credentials: true
+}));
 
 app.use("/api/bookings/webhook", express.raw({ type: "application/json" }));
 app.use((req, res, next) => {
@@ -33,7 +42,6 @@ app.use("/api/location-settings", require("./routes/locationSettings"));
 app.use("/api/hostel-structure", require("./routes/hostelStructure"));
 const uploadRoutes = require('./routes/upload');
 app.use('/api/upload', uploadRoutes);
-
 
 app.get("/", (req, res) => res.json({ message: "ILPD Hostel API Running" }));
 app.get("/health", (req, res) => res.status(200).json({ status: "ok" }));
