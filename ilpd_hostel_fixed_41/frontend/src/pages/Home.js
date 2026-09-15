@@ -92,7 +92,7 @@ export default function Home({ user }) {
         <div style={{ ...styles.heroContent, position: "relative", zIndex: 2 }}>
           <div style={styles.heroBadge}>🇷🇼 Nyanza, Southern Province, Rwanda</div>
           <h1 style={styles.heroTitle}>WELCOME TO<br /><span style={{ color: "#b8860b" }}>ILPD HOSTEL</span></h1>
-          <p style={styles.heroSub}>Experience comfort redefined in the heart of Nyanza, Rwanda. Book online, pay securely and skip the reception queue entirely.</p>
+          <p style={styles.heroSub}>Experience comfort redefined in the heart of Nyanza at The Institute of Legal Practice and Development (ILPD), Rwanda. Book online, pay securely and skip the reception queue entirely.</p>
           <div style={styles.heroBtns}>
             <Link to={user ? (user.role === "admin" ? "/admin" : "/rooms") : "/register"}><button style={styles.primaryBtn}>{user?.role === "admin" ? "🏨 Go to Admin Dashboard" : "🏨 Book Your Room Now"}</button></Link>
             <a href="#rooms"><button style={styles.outlineBtn}>Explore Rooms ↓</button></a>

@@ -12,6 +12,7 @@ const userSchema = new mongoose.Schema({
   position: { type: String, default: "" },
   addressOrInstitution: { type: String, default: "" },
   purposeOfVisit: { type: String, default: "" },
+  deletedAt: { type: Date, default: null },
 }, { timestamps: true });
 
 userSchema.pre("save", async function (next) {
