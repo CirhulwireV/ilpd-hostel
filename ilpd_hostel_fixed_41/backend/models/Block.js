@@ -9,6 +9,7 @@ const subBlockSchema = new mongoose.Schema({
 const blockSchema = new mongoose.Schema({
   name: { type: String, required: true, trim: true },
   accommodationType: { type: String, enum: ["outside_hostel", "ilpd_building"], required: true },
+  billingType: { type: String, enum: ["per_night", "per_month"], default: "per_month" },
   usesCategories: { type: Boolean, default: true }, // false = all rooms same tariff
   description: { type: String, default: "", trim: true },
   active: { type: Boolean, default: true },

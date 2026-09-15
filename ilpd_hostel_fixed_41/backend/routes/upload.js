@@ -29,14 +29,9 @@ router.post('/rooms/images', auth, upload.array('images', 5), async (req, res) =
       const b64 = Buffer.from(file.buffer).toString('base64');
       const dataURI = `data:${file.mimetype};base64,${b64}`;
 
-      // Upload to Cloudinary
+      // Upload to Cloudinary — ORIGINAL SIZE, no transformation
       const result = await cloudinary.uploader.upload(dataURI, {
-        folder: 'hostel/rooms',
-        transformation: [
-          { width: 1200, height: 900, crop: 'limit' },
-          { quality: 'auto' },
-          { fetch_format: 'auto' }
-        ]
+        folder: 'hostel/rooms'
       });
 
       console.log(`✅ Uploaded: ${result.secure_url}`);
