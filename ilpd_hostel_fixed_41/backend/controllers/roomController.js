@@ -12,8 +12,6 @@ const invalidateRoomCache = () => redis.delPattern("rooms:*").then(() => Promise
 ]));
 
 const getAllowedCategories = async (accommodationType) => {
-  // Categories are admin-managed. Include global categories and any
-  // legacy categories belonging to the selected accommodation type.
   const globalCats = await Category.find({
     active: true,
     $or: [{ accommodationType }, { accommodationType: { $exists: false } }, { accommodationType: null }]
@@ -25,10 +23,10 @@ function getHostelSection(roomNumber, requestedSection) {
   const trimmed = String(requestedSection || "").trim();
   return trimmed || null;
 }
+
 const MAX_ROOM_IMAGE_BYTES = 3 * 1024 * 1024;
 const validateImageData = (imageData) => {
   if (!imageData) return null;
-  // New uploads are S3/CloudFront URLs; Base64 is accepted only for old records.
   if (typeof imageData === "string" && /^https:\/\//.test(imageData)) return null;
   if (typeof imageData !== "string" || !/^data:image\/(jpeg|jpg|png|webp);base64,[A-Za-z0-9+/=]+$/.test(imageData)) {
     return "Room image must be a JPG, PNG, or WebP image.";
@@ -39,8 +37,6 @@ const validateImageData = (imageData) => {
   return null;
 };
 
-// Uploads happen before a room is created or updated. The client then submits
-// these URL strings to the existing room endpoints, keeping image bytes out of MongoDB.
 exports.uploadRoomImages = async (req, res) => {
   const missingSettings = getMissingSettings();
   if (missingSettings.length) {
@@ -57,21 +53,15 @@ exports.uploadRoomImages = async (req, res) => {
   }
 };
 
-// Rooms can have more than one photo. Capped at 5 so a room with many photos
-// never turns into a huge database document - each photo is already capped
-// at 3MB above, so 5 photos is a sane ceiling (~15MB worst case per room).
-const MAX_ROOM_IMAGES = 5;
 const validateImages = (images) => {
   if (!images || !images.length) return null;
   if (!Array.isArray(images)) return "Room photos must be a list of images.";
-  if (images.length > MAX_ROOM_IMAGES) return `You can upload up to ${MAX_ROOM_IMAGES} photos per room.`;
   for (const img of images) {
     const err = validateImageData(img);
     if (err) return err;
   }
   return null;
 };
-
 
 const DEFAULT_CATEGORY_DEFAULTS = {
   maxGuests: 2, size: "25 m²", view: "Garden View", bedType: "Bed",
@@ -88,7 +78,6 @@ const CATEGORY_DEFAULTS = new Proxy({}, {
       description: "Comfortable and cozy room with all essential amenities for a pleasant stay.",
       amenities: ["Bed", "TV", "Free WiFi", "Private Bathroom"]
     },
-
     VIP: {
       maxGuests: 3,
       size: "40 m²",
@@ -97,7 +86,6 @@ const CATEGORY_DEFAULTS = new Proxy({}, {
       description: "Spacious room with premium furnishings and city views.",
       amenities: ["Bed", "TV", "Free WiFi", "Private Bathroom"]
     },
-
     VVIP: {
       maxGuests: 4,
       size: "80 m²",
@@ -109,14 +97,18 @@ const CATEGORY_DEFAULTS = new Proxy({}, {
   }[key] || DEFAULT_CATEGORY_DEFAULTS)
 });
 
+// ⭐ UPDATED: supports filtering by hostelSection (block name)
 exports.getRooms = async (req, res) => {
   try {
-    const { category, status, accommodationType } = req.query;
+    const { category, status, accommodationType, hostelSection } = req.query;
     const filter = {};
     if (category) filter.category = category;
     if (status) filter.status = status;
     if (accommodationType && ACCOMMODATION_TYPES[accommodationType]) {
       filter.accommodationType = accommodationType;
+    }
+    if (hostelSection !== undefined && hostelSection !== "") {
+      filter.hostelSection = hostelSection;
     }
     const rooms = await Room.find(filter).sort({ accommodationType: 1, roomNumber: 1, hostelSection: 1 });
     res.json(rooms);
@@ -237,8 +229,6 @@ exports.createRoom = async (req, res) => {
     if (imagesError) return res.status(400).json({ message: imagesError });
     if (!ACCOMMODATION_TYPES[accommodationType]) return res.status(400).json({ message: "Invalid accommodation location." });
 
-    // Room numbers only need to be unique within the selected accommodation location.
-    // This allows, for example, Room 101 to exist in both buildings.
     const existingFilter = { roomNumber, accommodationType };
     if (hostelSection) existingFilter.hostelSection = hostelSection;
     const existing = await Room.findOne(existingFilter);
@@ -279,7 +269,6 @@ exports.createRoom = async (req, res) => {
     res.status(500).json({ message: err.message });
   }
 };
-
 
 exports.bulkCreateRooms = async (req, res) => {
   try {
@@ -451,12 +440,6 @@ exports.deleteRoom = async (req, res) => {
   }
 };
 
-// Self-service version of what used to require a developer running a terminal
-// script. Finds rooms that are exact duplicates (same location + room number
-// + block) and merges them, moving any bookings onto one surviving room —
-// never deleting a room if that would risk two guests' bookings overlapping.
-// Also fixes any room stuck showing the wrong available/booked status.
-// Pass ?dryRun=true to preview without making changes.
 exports.checkRoomHealth = async (req, res) => {
   const dryRun = req.query.dryRun === "true";
   try {
@@ -486,7 +469,6 @@ exports.checkRoomHealth = async (req, res) => {
           ]);
           scored.push({ r, refCount: direct.length + occupant.length });
         }
-        // Prefer keeping the room with the most booking history, then the one with a photo.
         scored.sort((a, b) => b.refCount - a.refCount || Number(Boolean(b.r.imageData)) - Number(Boolean(a.r.imageData)));
         const keeper = scored[0].r;
         for (const { r } of scored.slice(1)) {
@@ -495,7 +477,6 @@ exports.checkRoomHealth = async (req, res) => {
             status: { $in: ACTIVE_BOOKING_STATUSES },
           });
           if (overlap) {
-            // Don't guess — surface it for a human to look at instead of merging.
             conflicts.push({ key, roomId: r._id, roomNumber: r.roomNumber });
             continue;
           }
@@ -511,9 +492,6 @@ exports.checkRoomHealth = async (req, res) => {
       }
     }
 
-    // Resync status for every remaining room, same logic used elsewhere -
-    // done as a couple of batch queries instead of one query per room, which
-    // was slow enough with many rooms to risk a request timeout.
     let statusFixed = 0;
     if (!dryRun) {
       const remaining = await Room.find({ status: { $ne: "maintenance" } }).select("_id status");

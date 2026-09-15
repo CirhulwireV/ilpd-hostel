@@ -10,18 +10,48 @@ const SERVICES = [
   { icon: "🧹", title: "Daily Housekeeping", desc: "Professional housekeeping service every day for all rooms." },
 ];
 
-const STATIC_IMAGES = {
-  "standard-ilpd": "/rooms/standard-ilpd.jpg",
-  "vip-ilpd": "/rooms/vip-ilpd.jpg",
-  "vvip-ilpd": "/rooms/vvip-ilpd.jpg",
-  "standard-outside": "/rooms/standard-outside.jpg",
-  "vip-outside": "/rooms/vip-outside.jpg",
-  "vvip-outside": "/rooms/vvip-outside.jpg",
-};
+const HERO_HOLD_MS = 3500;
+
+function HeroBackground({ images }) {
+  const [index, setIndex] = useState(0);
+  const list = Array.isArray(images) ? images.filter(Boolean) : [];
+
+  useEffect(() => {
+    if (list.length < 2) return;
+    const t = setInterval(() => {
+      setIndex((i) => (i + 1) % list.length);
+    }, HERO_HOLD_MS);
+    return () => clearInterval(t);
+  }, [list.length]);
+
+  if (!list.length) return null;
+
+  return (
+    <>
+      {list.map((src, i) => (
+        <div
+          key={src + i}
+          style={{
+            position: "absolute",
+            inset: 0,
+            backgroundImage: `linear-gradient(160deg, rgba(15,30,60,0.35) 0%, rgba(10,20,45,0.25) 60%, rgba(184,134,11,0.05) 100%), url('${src}')`,
+            backgroundSize: "cover",
+            backgroundPosition: "center",
+            backgroundRepeat: "no-repeat",
+            opacity: i === index ? 1 : 0,
+            transition: "opacity 2s ease-in-out",
+            willChange: "opacity",
+          }}
+        />
+      ))}
+    </>
+  );
+}
 
 export default function Home({ user }) {
   const [rooms, setRooms] = useState([]);
   const [blocks, setBlocks] = useState([]);
+  const [heroImages, setHeroImages] = useState([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -37,65 +67,29 @@ export default function Home({ user }) {
       .catch(() => setLoading(false));
   }, []);
 
-  const getRoomImage = (category, accommodationType) => {
-    const room = rooms.find(
-      (r) => r.category === category && r.accommodationType === accommodationType
-    );
-    if (room?.images?.length > 0 && room.images[0]) {
-      return room.images[0];
-    }
-    const type = accommodationType === "ilpd_building" ? "ilpd" : "outside";
-    const key = `${category.toLowerCase()}-${type}`;
-    return STATIC_IMAGES[key] || `/rooms/${category.toLowerCase()}-${type}.jpg`;
-  };
-
-  const getRoomCount = (category, accommodationType) => {
-    return rooms.filter(
-      (r) => r.category === category && r.accommodationType === accommodationType
-    ).length;
-  };
-
-  const getRoomPrice = (category, accommodationType) => {
-    const room = rooms.find(
-      (r) => r.category === category && r.accommodationType === accommodationType
-    );
-    return room?.price || 0;
-  };
-
-  const getTotalRoomsByType = (accommodationType) => {
-    return rooms.filter(r => r.accommodationType === accommodationType).length;
-  };
-
-  const getCategories = (accommodationType) => {
-    const uniqueCategories = [...new Set(
-      rooms
-        .filter(r => r.accommodationType === accommodationType)
-        .map(r => r.category)
-    )];
-    return uniqueCategories.length > 0 ? uniqueCategories : ["Standard", "VIP", "VVIP"];
-  };
+  useEffect(() => {
+    API.get("/settings/hero")
+      .then(({ data }) => setHeroImages(data.images || []))
+      .catch(() => setHeroImages([]));
+  }, []);
 
   if (loading) {
     return (
-      <div style={{ 
-        minHeight: "100vh", 
-        display: "flex", 
-        alignItems: "center", 
-        justifyContent: "center",
-        fontSize: "18px",
-        color: "#666"
-      }}>
+      <div style={{ minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "18px", color: "#666" }}>
         Loading rooms...
       </div>
     );
   }
 
+  const bookNowHref = user ? (user.role === "admin" ? "/admin" : "/rooms") : "/register";
+
   return (
     <div style={{ fontFamily: "'Inter', sans-serif" }}>
 
       {/* HERO */}
-      <div style={styles.hero}>
-        <div style={styles.heroContent}>
+      <div style={{ ...styles.hero, position: "relative", overflow: "hidden" }}>
+        <HeroBackground images={heroImages} />
+        <div style={{ ...styles.heroContent, position: "relative", zIndex: 2 }}>
           <div style={styles.heroBadge}>🇷🇼 Nyanza, Southern Province, Rwanda</div>
           <h1 style={styles.heroTitle}>WELCOME TO<br /><span style={{ color: "#b8860b" }}>ILPD HOSTEL</span></h1>
           <p style={styles.heroSub}>Experience comfort redefined in the heart of Nyanza, Rwanda. Book online, pay securely and skip the reception queue entirely.</p>
@@ -119,7 +113,7 @@ export default function Home({ user }) {
       </div>
 
       {/* ABOUT */}
-      <div style={styles.section}>
+      <div id="about" style={styles.section}>
         <div className="container" style={styles.aboutGrid}>
           <div style={styles.aboutBox}>
             <h3 style={{ color: "#b8860b", fontWeight: "700", fontSize: "20px" }}>ILPD Hostel</h3>
@@ -134,8 +128,8 @@ export default function Home({ user }) {
             <h2 style={styles.sectionTitle}>ILPD Hostel<br />Contact & Campus Info</h2>
             <p style={{ color: "#666", lineHeight: "1.8", marginBottom: "12px" }}>The Institute of Legal Practice and Development (ILPD) main campus is located on Avenue des Sports in Nyanza, Southern Province, Rwanda, about 95 km from Kigali.</p>
             <p style={{ color: "#666", lineHeight: "1.8", marginBottom: "12px" }}>📍 Avenue des Sports, P.O. Box 49, Nyanza, Southern Province, Rwanda</p>
-            <p style={{ color: "#666", lineHeight: "1.8", marginBottom: "12px" }}>✉️ info@ilpd.ac.rw &nbsp;|&nbsp; 📞 +250 788 891 482</p>
-            <p style={{ color: "#666", lineHeight: "1.8", marginBottom: "24px" }}>🎓 Academic Registrar: registrar@ilpd.ac.rw / +250 788 306 034</p>
+            <p style={{ color: "#666", lineHeight: "1.8", marginBottom: "12px" }}>✉️ info@ilpd.ac.rw &nbsp;|&nbsp; 📞 +250 783 257 155</p>
+            <p style={{ color: "#666", lineHeight: "1.8", marginBottom: "24px" }}>🎓 Academic Registrar: registrar@ilpd.ac.rw / +250 783 257 155</p>
             <div style={styles.aboutFeatures}>
               {["✅ No Queue Check-in", "✅ Online Booking", "✅ Secure Payment", "✅ 24/7 Support"].map((f) => (
                 <span key={f} style={styles.aboutFeature}>{f}</span>
@@ -172,7 +166,7 @@ export default function Home({ user }) {
         </div>
       </div>
 
-      {/* ROOMS — fully driven by admin-configured blocks and rooms */}
+      {/* ROOMS */}
       <div id="rooms" style={styles.section}>
         <div className="container">
           <div style={{ textAlign: "center" }}>
@@ -186,11 +180,16 @@ export default function Home({ user }) {
               No accommodation blocks have been configured yet.
             </div>
           ) : blocks.map((block) => {
-            const blockRooms = rooms.filter((r) =>
-              r.hostelSection === block.name || r.accommodationType === block.accommodationType
-            );
+            const blockRooms = rooms.filter((r) => r.hostelSection === block.name);
             if (!blockRooms.length) return null;
-            const categoryNames = [...new Set(blockRooms.map((r) => r.category).filter(Boolean))];
+
+            const isWholeBlock = block.usesCategories !== true;
+
+            const categoryNames = isWholeBlock
+              ? ["__whole_block__"]
+              : [...new Set(blockRooms.map((r) => r.category).filter(Boolean))];
+
+            const billingLabel = block.billingType === "per_night" ? "billed per night" : "billed per month";
 
             return (
               <div key={block._id} style={{ ...styles.roomLocation, marginTop: "28px" }}>
@@ -198,34 +197,82 @@ export default function Home({ user }) {
                   <div>
                     <h3 style={styles.locationTitle}>🏨 {block.name}</h3>
                     <p style={styles.locationSub}>
-                      {blockRooms.length} rooms · {block.accommodationType === "ilpd_building" ? "billed per night" : "billed per month"} · {categoryNames.join(", ")}
+                      {blockRooms.length} rooms · {billingLabel}
+                      {!isWholeBlock && categoryNames.length > 0 ? ` · ${categoryNames.join(", ")}` : ""}
                     </p>
                   </div>
-                  <Link to="/rooms"><button style={styles.primaryBtn}>View Rooms →</button></Link>
                 </div>
+
                 <div style={styles.photoGrid}>
-                  {categoryNames.map((category) => {
-                    const room = blockRooms.find((r) => r.category === category);
-                    const image = room?.images?.[0] || room?.imageData || "";
-                    const price = room?.price || 0;
-                    return (
-                      <div key={category} style={styles.photoCard}>
+                  {categoryNames.flatMap((category) => {
+                    const cardIsWholeBlock = category === "__whole_block__";
+
+                    const categoryRooms = blockRooms.filter(
+                      (r) => cardIsWholeBlock || r.category === category
+                    );
+                    if (!categoryRooms.length) return [];
+
+                    const displayName = cardIsWholeBlock ? block.name : category;
+                    const badgeLabel = cardIsWholeBlock ? "Rooms" : category;
+                    const periodSuffix = block.billingType === "per_night" ? "/night" : "/month";
+
+                    const representative =
+                      categoryRooms.find(
+                        (r) => (r.images && r.images.length > 0) || r.imageData
+                      ) || categoryRooms[0];
+
+                    const price = representative?.price || 0;
+                    const address = representative?.address || "";
+                    const amenities = Array.isArray(representative?.amenities)
+                      ? representative.amenities
+                      : [];
+
+                    const allPhotos = categoryRooms.flatMap((r) => {
+                      if (Array.isArray(r.images) && r.images.length) return r.images;
+                      if (r.imageData) return [r.imageData];
+                      return [];
+                    });
+
+                    const uniquePhotos = Array.from(new Set(allPhotos));
+                    const photos = uniquePhotos.length ? uniquePhotos : [null];
+
+                    return photos.map((photo, i) => (
+                      <div key={`${category}-${i}`} style={styles.photoCard}>
                         <div style={styles.imageWrapper}>
-                          {image ? (
-                            <img src={image} alt={`${category} room in ${block.name}`} style={styles.locationPhoto} />
+                          {photo ? (
+                            <img
+                              src={photo}
+                              alt={`${displayName} at ${block.name}`}
+                              style={{ width: "100%", height: "100%", objectFit: "cover", objectPosition: "center", display: "block" }}
+                            />
                           ) : (
-                            <div style={{ height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "42px", color: "#bbb" }}>🏨</div>
+                            <div style={{ width: "100%", height: "100%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: "42px", color: "#bbb", background: "#f8f9fa" }}>🏨</div>
                           )}
-                          <span style={{ ...styles.cardTag, background: "#b8860b" }}>{category}</span>
+                          <span style={{ ...styles.cardTag, background: "#b8860b" }}>{badgeLabel}</span>
                         </div>
-                        <div style={{ padding: "14px" }}>
-                          <h4 style={{ margin: "0 0 6px" }}>{category}</h4>
-                          <p style={{ color: "#666", fontSize: "13px", margin: 0 }}>
-                            {blockRooms.filter((r) => r.category === category).length} rooms · {Number(price).toLocaleString()} RWF
+
+                        <div style={styles.cardBody}>
+                          <h4 style={{ margin: "0 0 4px", fontWeight: "700", fontSize: "18px", color: "#1a1a2e" }}>{displayName}</h4>
+                          <p style={{ margin: "0 0 8px", fontSize: "13px", color: "#b8860b", fontWeight: "600", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>🏨 {block.name}</p>
+                          {address && (
+                            <p style={{ margin: "0 0 6px", fontSize: "13px", color: "#666", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>📍 {address}</p>
+                          )}
+                          <p style={{ margin: "0 0 6px", fontSize: "15px", fontWeight: "700", color: "#b8860b" }}>
+                            Price: {Number(price).toLocaleString()} RWF
+                            <span style={{ fontSize: "12px", fontWeight: "600", color: "#666" }}> {periodSuffix}</span>
                           </p>
+                          {amenities.length > 0 && (
+                            <p style={{ margin: "0 0 12px", fontSize: "12px", color: "#555", whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
+                              🛏 {amenities.slice(0, 4).join(" · ")}
+                              {amenities.length > 4 ? ` +${amenities.length - 4}` : ""}
+                            </p>
+                          )}
+                          <Link to={bookNowHref} style={{ display: "inline-block", textDecoration: "none", marginTop: "auto", paddingTop: "4px" }}>
+                            <button style={{ ...styles.primaryBtn, padding: "10px 20px", fontSize: "14px", width: "100%" }}>Book Now →</button>
+                          </Link>
                         </div>
                       </div>
-                    );
+                    ));
                   })}
                 </div>
               </div>
@@ -235,7 +282,7 @@ export default function Home({ user }) {
       </div>
 
       {/* SERVICES */}
-      <div style={{ ...styles.section, background: "#f8f9fa" }}>
+      <div id="services" style={{ ...styles.section, background: "#f8f9fa" }}>
         <div className="container">
           <div style={{ textAlign: "center" }}>
             <div style={styles.sectionLabel}>Amenities</div>
@@ -267,12 +314,12 @@ export default function Home({ user }) {
       </div>
 
       {/* FOOTER */}
-      <footer style={styles.footer}>
+      <footer id="contact" style={styles.footer}>
         <div className="container">
           <div style={styles.footerGrid}>
             <div>
               <div style={{ display: "flex", alignItems: "center", gap: "8px", marginBottom: "12px" }}>
-                <img src="/ILPD MARK.webp" alt="ILPD" style={{ height: "30px", objectFit: "contain" }} />
+                <img src="/cp.png" alt="ILPD" style={{ height: "30px", objectFit: "contain" }} />
                 <span style={styles.footerBrand}>ILPD Institution</span>
               </div>
               <p style={styles.footerDesc}>ILPD Institution in Nyanza, Rwanda, supporting education and community development with modern digital services.</p>
@@ -292,7 +339,7 @@ export default function Home({ user }) {
             <div>
               <p style={styles.footerHeading}>Contact Us</p>
               <p style={styles.footerLink}>📍 Avenue des Sports, Nyanza, Southern Province, Rwanda</p>
-              <p style={styles.footerLink}>📞 +250 788 891 482</p>
+              <p style={styles.footerLink}>📞 +250 783 257 155</p>
               <p style={styles.footerLink}>✉️ info@ilpd.ac.rw</p>
               <p style={styles.footerLink}>🌐 www.ilpd.ac.rw</p>
             </div>
@@ -307,13 +354,12 @@ export default function Home({ user }) {
   );
 }
 
-// ✅ PERFECT BALANCE - Not too big, not too small, fully visible
 const styles = {
-  hero: { backgroundImage: "linear-gradient(160deg, rgba(15,30,60,0.60) 0%, rgba(10,20,45,0.45) 60%, rgba(184,134,11,0.12) 100%), url('/ILPD.webp')", backgroundSize: "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" },
+  hero: { backgroundImage: "linear-gradient(160deg, rgba(15,30,60,0.35) 0%, rgba(10,20,45,0.25) 60%, rgba(184,134,11,0.05) 100%)", backgroundSize: "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat", minHeight: "100vh", display: "flex", alignItems: "center", justifyContent: "center", padding: "40px 20px" },
   heroContent: { textAlign: "center", maxWidth: "750px" },
   heroBadge: { display: "inline-block", background: "rgba(184,134,11,0.25)", color: "#f0c040", border: "1px solid #b8860b", padding: "8px 20px", borderRadius: "25px", fontSize: "14px", fontWeight: "600", marginBottom: "24px" },
-  heroTitle: { color: "#fff", fontSize: "58px", fontWeight: "800", lineHeight: "1.15", marginBottom: "20px" },
-  heroSub: { color: "rgba(255,255,255,0.85)", fontSize: "17px", lineHeight: "1.8", marginBottom: "36px" },
+  heroTitle: { color: "#fff", fontSize: "58px", fontWeight: "800", lineHeight: "1.15", marginBottom: "20px", textShadow: "0 2px 12px rgba(0,0,0,0.4)" },
+  heroSub: { color: "rgba(255,255,255,0.95)", fontSize: "17px", lineHeight: "1.8", marginBottom: "36px", textShadow: "0 1px 6px rgba(0,0,0,0.4)" },
   heroBtns: { display: "flex", gap: "16px", justifyContent: "center", flexWrap: "wrap", marginBottom: "48px" },
   primaryBtn: { background: "#b8860b", color: "#fff", border: "none", padding: "14px 32px", borderRadius: "8px", cursor: "pointer", fontWeight: "700", fontSize: "16px" },
   outlineBtn: { background: "transparent", color: "#fff", border: "2px solid rgba(255,255,255,0.6)", padding: "14px 32px", borderRadius: "8px", cursor: "pointer", fontWeight: "600", fontSize: "16px" },
@@ -335,51 +381,15 @@ const styles = {
   locationHeader: { display: "flex", justifyContent: "space-between", alignItems: "center", gap: "20px", flexWrap: "wrap", marginBottom: "20px" },
   locationTitle: { fontSize: "22px", fontWeight: "800", marginBottom: "6px", color: "#1a1a2e" },
   locationSub: { color: "#666", fontSize: "13px", margin: 0 },
-  
-  // ✅ PERFECT BALANCE - Image wrapper with proper size
-  imageWrapper: {
-    width: "100%",
-    height: "190px",  // ← PERFECT SIZE - Not too big, not too small
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    backgroundColor: "#f8f9fa",
-    borderRadius: "12px 12px 0 0",
-    overflow: "hidden"
-  },
-  
-  photoGrid: {
-    display: "grid",
-    gridTemplateColumns: "repeat(auto-fit, minmax(200px, 1fr))",
-    gap: "16px"
-  },
-  
-  photoCard: {
-    overflow: "hidden",
-    borderRadius: "12px",
-    border: "1px solid #f0ede6",
-    background: "#fff",
-    boxShadow: "0 2px 8px rgba(0,0,0,0.05)"
-  },
-  
-  // ✅ Shows FULL image inside wrapper
-  locationPhoto: {
-    width: "100%",
-    height: "100%",
-    objectFit: "contain",
-    display: "block"
-  },
-  
-  photoBody: { 
-    padding: "10px 12px 12px 12px", 
-    display: "flex", 
-    flexDirection: "column", 
-    gap: "2px"
-  },
+  photoGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(260px, 340px))", gap: "18px", justifyContent: "center" },
+  photoCard: { overflow: "hidden", borderRadius: "12px", border: "1px solid #f0ede6", background: "#fff", boxShadow: "0 2px 10px rgba(0,0,0,0.06)", display: "flex", flexDirection: "column" },
+  imageWrapper: { position: "relative", width: "100%", height: "220px", overflow: "hidden", background: "#f8f9fa" },
+  cardTag: { position: "absolute", top: "12px", left: "12px", color: "#fff", padding: "5px 12px", borderRadius: "20px", fontSize: "12px", fontWeight: "700", boxShadow: "0 2px 8px rgba(0,0,0,0.25)", zIndex: 2 },
+  cardBody: { padding: "16px 18px 18px", display: "flex", flexDirection: "column", flexGrow: 1 },
   servicesGrid: { display: "grid", gridTemplateColumns: "repeat(auto-fill, minmax(220px, 1fr))", gap: "20px" },
   serviceCard: { padding: "28px 20px", background: "#ffffff", borderRadius: "14px", textAlign: "center", boxShadow: "0 2px 14px rgba(0,0,0,0.05)", border: "1px solid #f0ede6" },
   serviceIcon: { fontSize: "36px", background: "#f8f9fa", width: "64px", height: "64px", borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", margin: "0 auto" },
-  cta: { backgroundImage: "linear-gradient(160deg, rgba(20,14,4,0.65), rgba(100,72,4,0.60)), url('/ILPD MARK.webp')", backgroundSize: "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat", padding: "80px 20px" },
+  cta: { backgroundImage: "linear-gradient(160deg, rgba(20,14,4,0.65), rgba(100,72,4,0.60)), url('/cp.png')", backgroundSize: "cover", backgroundPosition: "center", backgroundRepeat: "no-repeat", padding: "80px 20px" },
   footer: { background: "#111", padding: "60px 20px 30px" },
   footerGrid: { display: "grid", gridTemplateColumns: "2fr 1fr 1fr 1fr", gap: "40px", marginBottom: "40px" },
   footerBrand: { fontSize: "22px", fontWeight: "700", color: "#b8860b", marginBottom: "12px" },
