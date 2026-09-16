@@ -1,6 +1,6 @@
 const Room = require("../models/Room");
 const Booking = require("../models/Booking");
-const { ACTIVE_BOOKING_STATUSES, ACCOMMODATION_TYPES, DEFAULT_ACCOMMODATION_TYPE, getAvailableRates } = require("../utils/bookingRules");
+const { ACTIVE_BOOKING_STATUSES, getAvailableRates } = require("../utils/bookingRules");
 const Category = require("../models/Category");
 const redis = require("../utils/redis");
 const { getMissingSettings, uploadRoomImage } = require("../utils/s3");
@@ -11,18 +11,10 @@ const invalidateRoomCache = () => redis.delPattern("rooms:*").then(() => Promise
   redis.delPattern("inventory:*"),
 ]));
 
-const getAllowedCategories = async (accommodationType) => {
-  const globalCats = await Category.find({
-    active: true,
-    $or: [{ accommodationType }, { accommodationType: { $exists: false } }, { accommodationType: null }]
-  }).select("name").lean();
+const getAllowedCategories = async () => {
+  const globalCats = await Category.find({ active: true }).select("name").lean();
   return [...new Set(globalCats.map((c) => c.name))];
 };
-
-function getHostelSection(roomNumber, requestedSection) {
-  const trimmed = String(requestedSection || "").trim();
-  return trimmed || null;
-}
 
 const MAX_ROOM_IMAGE_BYTES = 3 * 1024 * 1024;
 const validateImageData = (imageData) => {
@@ -71,46 +63,32 @@ const DEFAULT_CATEGORY_DEFAULTS = {
 const CATEGORY_DEFAULTS = new Proxy({}, {
   get: (_, key) => ({
     Standard: {
-      maxGuests: 2,
-      size: "25 m²",
-      view: "Garden View",
-      bedType: "Bed",
+      maxGuests: 2, size: "25 m²", view: "Garden View", bedType: "Bed",
       description: "Comfortable and cozy room with all essential amenities for a pleasant stay.",
       amenities: ["Bed", "TV", "Free WiFi", "Private Bathroom"]
     },
     VIP: {
-      maxGuests: 3,
-      size: "40 m²",
-      view: "City View",
-      bedType: "Bed",
+      maxGuests: 3, size: "40 m²", view: "City View", bedType: "Bed",
       description: "Spacious room with premium furnishings and city views.",
       amenities: ["Bed", "TV", "Free WiFi", "Private Bathroom"]
     },
     VVIP: {
-      maxGuests: 4,
-      size: "80 m²",
-      view: "Panoramic View",
-      bedType: "Bed",
+      maxGuests: 4, size: "80 m²", view: "Panoramic View", bedType: "Bed",
       description: "Ultra-luxury VVIP room with panoramic views.",
       amenities: ["Bed", "TV", "Free WiFi", "Private Bathroom"]
     }
   }[key] || DEFAULT_CATEGORY_DEFAULTS)
 });
 
-// ⭐ UPDATED: supports filtering by hostelSection (block name)
 exports.getRooms = async (req, res) => {
   try {
-    const { category, status, accommodationType, hostelSection } = req.query;
+    const { category, status, hostelSection, block } = req.query;
     const filter = {};
     if (category) filter.category = category;
     if (status) filter.status = status;
-    if (accommodationType && ACCOMMODATION_TYPES[accommodationType]) {
-      filter.accommodationType = accommodationType;
-    }
-    if (hostelSection !== undefined && hostelSection !== "") {
-      filter.hostelSection = hostelSection;
-    }
-    const rooms = await Room.find(filter).sort({ accommodationType: 1, roomNumber: 1, hostelSection: 1 });
+    const section = hostelSection !== undefined ? hostelSection : block;
+    if (section !== undefined && section !== "") filter.hostelSection = section;
+    const rooms = await Room.find(filter).sort({ roomNumber: 1, hostelSection: 1 });
     res.json(rooms);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -119,21 +97,17 @@ exports.getRooms = async (req, res) => {
 
 exports.getInventorySummary = async (req, res) => {
   try {
-    const accommodationType = req.query.accommodationType;
-    const filter = accommodationType && ACCOMMODATION_TYPES[accommodationType]
-      ? { accommodationType }
-      : {};
-    const rooms = await Room.find(filter).select("roomNumber category accommodationType status").lean();
+    const rooms = await Room.find({}).select("roomNumber category hostelSection status").lean();
     const summary = {};
     for (const room of rooms) {
-      const location = room.accommodationType || "outside_hostel";
+      const blockName = room.hostelSection || "Unassigned";
       const category = room.category;
-      summary[location] ||= {};
-      summary[location][category] ||= { total: 0, available: 0, maintenance: 0, booked: 0 };
-      summary[location][category].total += 1;
-      if (room.status === "available") summary[location][category].available += 1;
-      if (room.status === "maintenance") summary[location][category].maintenance += 1;
-      if (room.status === "booked") summary[location][category].booked += 1;
+      summary[blockName] ||= {};
+      summary[blockName][category] ||= { total: 0, available: 0, maintenance: 0, booked: 0 };
+      summary[blockName][category].total += 1;
+      if (room.status === "available") summary[blockName][category].available += 1;
+      if (room.status === "maintenance") summary[blockName][category].maintenance += 1;
+      if (room.status === "booked") summary[blockName][category].booked += 1;
     }
     res.json(summary);
   } catch (err) {
@@ -143,8 +117,7 @@ exports.getInventorySummary = async (req, res) => {
 
 exports.getBlocks = async (req, res) => {
   try {
-    const accommodationType = req.query.accommodationType || "outside_hostel";
-    const blocks = await Room.distinct("hostelSection", { accommodationType, hostelSection: { $ne: null } });
+    const blocks = await Room.distinct("hostelSection", { hostelSection: { $ne: null } });
     res.json(blocks.filter(Boolean).sort());
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -153,9 +126,7 @@ exports.getBlocks = async (req, res) => {
 
 exports.getRates = async (req, res) => {
   try {
-    const accommodationType = req.query.accommodationType;
-    if (!ACCOMMODATION_TYPES[accommodationType]) return res.status(400).json({ message: "Invalid accommodation location." });
-    const rates = await getAvailableRates(accommodationType);
+    const rates = await getAvailableRates();
     res.json(rates);
   } catch (err) {
     res.status(500).json({ message: err.message });
@@ -164,9 +135,10 @@ exports.getRates = async (req, res) => {
 
 exports.getAvailableRoomsForBooking = async (req, res) => {
   try {
-    const { category, checkIn, checkOut, accommodationType = DEFAULT_ACCOMMODATION_TYPE } = req.query;
-    if (!category || !checkIn || !checkOut || !ACCOMMODATION_TYPES[accommodationType]) {
-      return res.status(400).json({ message: "Category, check-in and check-out are required." });
+    const { category, checkIn, checkOut, hostelSection, block } = req.query;
+    const section = hostelSection || block;
+    if (!category || !checkIn || !checkOut || !section) {
+      return res.status(400).json({ message: "Category/block, check-in and check-out are required." });
     }
     const start = new Date(checkIn);
     const end = new Date(checkOut);
@@ -174,10 +146,9 @@ exports.getAvailableRoomsForBooking = async (req, res) => {
       return res.status(400).json({ message: "Invalid booking dates." });
     }
 
-    const locationFilter = accommodationType === "outside_hostel"
-      ? "outside_hostel"
-      : accommodationType;
-    const rooms = await Room.find({ category, accommodationType: locationFilter, status: "available" }).sort({ roomNumber: 1, hostelSection: 1 }).lean();
+    const rooms = await Room.find({ hostelSection: section, status: "available" })
+      .sort({ roomNumber: 1, category: 1 })
+      .lean();
     const roomIds = rooms.map((room) => room._id);
     const conflicts = await Booking.find({
       status: { $in: ACTIVE_BOOKING_STATUSES },
@@ -208,12 +179,12 @@ exports.getRoomById = async (req, res) => {
 
 exports.createRoom = async (req, res) => {
   try {
-    const { roomNumber, category, accommodationType = DEFAULT_ACCOMMODATION_TYPE, hostelSection: requestedSection, subBlock = "", price, address = "", images = [], imageData = "", imageName = "" } = req.body;
+    const { roomNumber, category, hostelSection: requestedSection, subBlock = "", price, address = "", images = [], imageData = "", imageName = "" } = req.body;
     if (!roomNumber || !category) {
       return res.status(400).json({ message: "Room number and category are required" });
     }
-    const allowedCategories = await getAllowedCategories(accommodationType);
-    if (!allowedCategories.includes(category)) {
+    const allowedCategories = await getAllowedCategories();
+    if (allowedCategories.length && !allowedCategories.includes(category)) {
       return res.status(400).json({ message: `Category must be one of: ${allowedCategories.join(", ")}` });
     }
     const numericPrice = Number(price);
@@ -223,13 +194,12 @@ exports.createRoom = async (req, res) => {
     if (!address.trim()) {
       return res.status(400).json({ message: "Location (town, province, country) is required." });
     }
-    const hostelSection = getHostelSection(roomNumber, requestedSection);
+    const hostelSection = String(requestedSection || "").trim() || null;
     const allImages = images.length ? images : (imageData ? [imageData] : []);
     const imagesError = validateImages(allImages);
     if (imagesError) return res.status(400).json({ message: imagesError });
-    if (!ACCOMMODATION_TYPES[accommodationType]) return res.status(400).json({ message: "Invalid accommodation location." });
 
-    const existingFilter = { roomNumber, accommodationType };
+    const existingFilter = { roomNumber };
     if (hostelSection) existingFilter.hostelSection = hostelSection;
     const existing = await Room.findOne(existingFilter);
     if (existing) {
@@ -241,7 +211,6 @@ exports.createRoom = async (req, res) => {
     const room = await Room.create({
       roomNumber,
       category,
-      accommodationType,
       ...(hostelSection ? { hostelSection, hostelSections: [hostelSection] } : { hostelSections: [] }),
       subBlock: subBlock.trim(),
       price: numericPrice,
@@ -273,7 +242,6 @@ exports.createRoom = async (req, res) => {
 exports.bulkCreateRooms = async (req, res) => {
   try {
     const {
-      accommodationType = DEFAULT_ACCOMMODATION_TYPE,
       category,
       roomNumbers,
       startNumber,
@@ -287,11 +255,8 @@ exports.bulkCreateRooms = async (req, res) => {
       subBlock = "",
     } = req.body;
 
-    if (!ACCOMMODATION_TYPES[accommodationType]) {
-      return res.status(400).json({ message: "Invalid accommodation location." });
-    }
-    const allowedCategories = await getAllowedCategories(accommodationType);
-    if (!allowedCategories.includes(category)) {
+    const allowedCategories = await getAllowedCategories();
+    if (allowedCategories.length && !allowedCategories.includes(category)) {
       return res.status(400).json({ message: `Category must be one of: ${allowedCategories.join(", ")}` });
     }
     const numericPrice = Number(price);
@@ -325,10 +290,10 @@ exports.bulkCreateRooms = async (req, res) => {
     const imagesError = validateImages(allImages);
     if (imagesError) return res.status(400).json({ message: imagesError });
 
-    const sectionFor = (n) => accommodationType === "outside_hostel" ? getHostelSection(n, requestedSection) : null;
-    const existing = await Room.find({ accommodationType, roomNumber: { $in: numbers }, hostelSection: { $in: numbers.map(sectionFor) } }).select("roomNumber hostelSection").lean();
+    const hostelSection = String(requestedSection || "").trim() || null;
+    const existing = await Room.find({ roomNumber: { $in: numbers }, hostelSection }).select("roomNumber hostelSection").lean();
     const existingSet = new Set(existing.map((r) => `${String(r.roomNumber)}|${r.hostelSection || ""}`));
-    const duplicates = numbers.filter((n) => existingSet.has(`${n}|${sectionFor(n) || ""}`));
+    const duplicates = numbers.filter((n) => existingSet.has(`${n}|${hostelSection || ""}`));
 
     if (duplicates.length) {
       return res.status(409).json({
@@ -341,8 +306,7 @@ exports.bulkCreateRooms = async (req, res) => {
     const docs = numbers.map((roomNumber) => ({
       roomNumber,
       category,
-      accommodationType,
-      ...(sectionFor(roomNumber) ? { hostelSection: sectionFor(roomNumber), hostelSections: [sectionFor(roomNumber)] } : { hostelSections: [] }),
+      ...(hostelSection ? { hostelSection, hostelSections: [hostelSection] } : { hostelSections: [] }),
       subBlock: subBlock.trim(),
       price: numericPrice,
       address: address.trim(),
@@ -375,9 +339,8 @@ exports.updateRoom = async (req, res) => {
     const allowed = {};
     if (roomNumber !== undefined) allowed.roomNumber = String(roomNumber).trim();
     if (category !== undefined) {
-      const room = await Room.findById(req.params.id).select("accommodationType").lean();
-      const allowedCategories = await getAllowedCategories(room?.accommodationType || DEFAULT_ACCOMMODATION_TYPE);
-      if (!allowedCategories.includes(category)) return res.status(400).json({ message: `Category must be one of: ${allowedCategories.join(", ")}` });
+      const allowedCategories = await getAllowedCategories();
+      if (allowedCategories.length && !allowedCategories.includes(category)) return res.status(400).json({ message: `Category must be one of: ${allowedCategories.join(", ")}` });
       allowed.category = category;
     }
     if (hostelSection !== undefined) { allowed.hostelSection = hostelSection.trim(); allowed.hostelSections = hostelSection.trim() ? [hostelSection.trim()] : []; }
@@ -445,7 +408,7 @@ exports.checkRoomHealth = async (req, res) => {
   try {
     const rooms = await Room.find({});
     const groups = new Map();
-    const keyOf = (r) => `${r.accommodationType}|${r.roomNumber}|${r.hostelSection || ""}`;
+    const keyOf = (r) => `${r.roomNumber}|${r.hostelSection || ""}`;
     for (const r of rooms) {
       const k = keyOf(r);
       if (!groups.has(k)) groups.set(k, []);
