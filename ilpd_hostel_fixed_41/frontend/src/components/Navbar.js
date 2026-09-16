@@ -1,5 +1,6 @@
 import React, { useState, useEffect } from "react";
 import { Link, useNavigate, useLocation } from "react-router-dom";
+import CartIcon from "./CartIcon";
 
 export default function Navbar({ user, logout }) {
   const navigate = useNavigate();
@@ -34,7 +35,6 @@ export default function Navbar({ user, logout }) {
   return (
     <nav style={styles.nav}>
       <div className="container" style={styles.inner}>
-
         <Link to="/" style={styles.brand} onClick={() => setMenuOpen(false)}>
           <img src="/cp.png" alt="ILPD" style={styles.brandImg} />
           <span style={styles.brandText}>ILPD HOSTEL</span>
@@ -63,6 +63,7 @@ export default function Navbar({ user, logout }) {
                   Admin
                 </Link>
               )}
+              <CartIcon user={user} />
               <Link to="/account" style={{ ...styles.link, ...(isActive("/account") ? styles.linkActive : {}) }}>
                 Account
               </Link>
@@ -98,9 +99,7 @@ export default function Navbar({ user, logout }) {
           <a href="/#rooms" onClick={goToSection("rooms")} style={styles.mobileLink}>Accommodation</a>
           <a href="/#services" onClick={goToSection("services")} style={styles.mobileLink}>Services</a>
           <a href="/#contact" onClick={goToSection("contact")} style={styles.mobileLink}>Contact Us</a>
-
           <div style={styles.mobileDivider} />
-
           {user ? (
             <>
               {user.role !== "admin" && (
@@ -109,6 +108,7 @@ export default function Navbar({ user, logout }) {
               {user.role === "admin" && (
                 <Link to="/admin" onClick={() => setMenuOpen(false)} style={styles.mobileLink}>Admin Dashboard</Link>
               )}
+              <Link to="/cart" onClick={() => setMenuOpen(false)} style={styles.mobileLink}>🛒 Cart</Link>
               <Link to="/account" onClick={() => setMenuOpen(false)} style={styles.mobileLink}>Account</Link>
               <button onClick={handleLogout} style={styles.mobileLogout}>Logout</button>
             </>
@@ -145,58 +145,10 @@ const styles = {
   dot: { color: "#ffffff", fontSize: "14px", fontWeight: "500", opacity: 0.9, userSelect: "none" },
   logoutBtn: { padding: "8px 16px", fontSize: "13px" },
   registerBtn: { padding: "8px 16px", fontSize: "13px" },
-  hamburger: {
-    background: "transparent",
-    border: "1px solid rgba(255,255,255,0.3)",
-    color: "#fff",
-    fontSize: "22px",
-    width: "44px",
-    height: "44px",
-    borderRadius: "8px",
-    cursor: "pointer",
-    alignItems: "center",
-    justifyContent: "center",
-    padding: 0,
-  },
-  mobileMenu: {
-    background: "#252540",
-    borderTop: "1px solid rgba(184,134,11,0.3)",
-    padding: "12px 16px 20px",
-    display: "flex",
-    flexDirection: "column",
-    gap: "4px",
-  },
-  mobileLink: {
-    color: "#fff",
-    fontSize: "15px",
-    fontWeight: "500",
-    textDecoration: "none",
-    padding: "14px 8px",
-    borderBottom: "1px solid rgba(255,255,255,0.08)",
-  },
+  hamburger: { background: "transparent", border: "1px solid rgba(255,255,255,0.3)", color: "#fff", fontSize: "22px", width: "44px", height: "44px", borderRadius: "8px", cursor: "pointer", alignItems: "center", justifyContent: "center", padding: 0 },
+  mobileMenu: { background: "#252540", borderTop: "1px solid rgba(184,134,11,0.3)", padding: "12px 16px 20px", display: "flex", flexDirection: "column", gap: "4px" },
+  mobileLink: { color: "#fff", fontSize: "15px", fontWeight: "500", textDecoration: "none", padding: "14px 8px", borderBottom: "1px solid rgba(255,255,255,0.08)" },
   mobileDivider: { height: "1px", background: "rgba(184,134,11,0.4)", margin: "8px 0" },
-  mobileLogout: {
-    background: "#b8860b",
-    color: "#fff",
-    border: "none",
-    padding: "14px 8px",
-    fontSize: "15px",
-    fontWeight: "700",
-    borderRadius: "8px",
-    cursor: "pointer",
-    marginTop: "8px",
-    textAlign: "center",
-  },
-  mobileRegister: {
-    background: "#b8860b",
-    color: "#fff",
-    padding: "14px 8px",
-    fontSize: "15px",
-    fontWeight: "700",
-    borderRadius: "8px",
-    textDecoration: "none",
-    marginTop: "8px",
-    textAlign: "center",
-    display: "block",
-  },
+  mobileLogout: { background: "#b8860b", color: "#fff", border: "none", padding: "14px 8px", fontSize: "15px", fontWeight: "700", borderRadius: "8px", cursor: "pointer", marginTop: "8px", textAlign: "center" },
+  mobileRegister: { background: "#b8860b", color: "#fff", padding: "14px 8px", fontSize: "15px", fontWeight: "700", borderRadius: "8px", textDecoration: "none", marginTop: "8px", textAlign: "center", display: "block" },
 };

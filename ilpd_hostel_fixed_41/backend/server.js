@@ -22,6 +22,7 @@ app.use(cors({
       "https://ilpd-hostel-application.vercel.app",
       "https://ilpd-hostel-app.vercel.app",
       "https://ilpd-hostel-n.vercel.app",
+      "https://ilpdhostelsystem.vercel.app",
     ];
     const isProd = prodOrigins.includes(origin);
     const isClientUrl = process.env.CLIENT_URL && origin === process.env.CLIENT_URL;
@@ -52,6 +53,7 @@ app.use("/api/monitoring", require("./routes/monitoring"));
 app.use("/api/location-settings", require("./routes/locationSettings"));
 app.use("/api/hostel-structure", require("./routes/hostelStructure"));
 app.use("/api/settings", require("./routes/settings"));
+app.use("/api/cart", require("./routes/cart"));
 const uploadRoutes = require("./routes/upload");
 app.use("/api/upload", uploadRoutes);
 

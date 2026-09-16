@@ -11,6 +11,7 @@ import MyBookings from "./pages/MyBookings";
 import AdminDashboard from "./pages/AdminDashboard";
 import Support from "./pages/Support";
 import Account from "./pages/Account";
+import Cart from "./pages/Cart";
 
 export default function App() {
   const [user, setUser] = useState(() => {
@@ -41,6 +42,7 @@ export default function App() {
         <Route path="/booking-success" element={user ? (user.role !== "admin" ? <BookingSuccess /> : <Navigate to="/admin" replace />) : <Navigate to="/login" replace />} />
         <Route path="/my-bookings" element={user ? (user.role !== "admin" ? <MyBookings /> : <Navigate to="/admin" replace />) : <Navigate to="/login" replace />} />
         <Route path="/support" element={user ? (user.role !== "admin" ? <Support /> : <Navigate to="/admin" replace />) : <Navigate to="/login" replace />} />
+        <Route path="/cart" element={<Cart user={user} />} />
         <Route path="/account" element={user ? <Account user={user} logout={logout} /> : <Navigate to="/login" replace />} />
         <Route path="/admin" element={user?.role === "admin" ? <AdminDashboard /> : <Navigate to="/" />} />
       </Routes>

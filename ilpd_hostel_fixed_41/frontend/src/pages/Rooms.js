@@ -1,4 +1,5 @@
 import React, { useState } from "react";
+import { useNavigate } from "react-router-dom";
 import API from "../api/axios";
 
 const CATEGORY_DISPLAY = {
@@ -29,7 +30,8 @@ const blockPeriod = (block) => {
   return block.accommodationType === "ilpd_building" ? "night" : "month";
 };
 
-export default function Rooms() {
+export default function Rooms({ user }) {
+  const navigate = useNavigate();
   const [booking, setBooking] = useState(null);
   const [showTerms, setShowTerms] = useState(null);
   const [termsAnswer, setTermsAnswer] = useState("");
@@ -44,12 +46,13 @@ export default function Rooms() {
   const [locationAddress, setLocationAddress] = useState("");
   const [roomsLoading, setRoomsLoading] = useState(false);
 
-  // ⭐ Whole-block (no categories) data pulled directly from rooms
-  const [wholeBlockPrice, setWholeBlockPrice] = useState(0);
-  const [wholeBlockPhoto, setWholeBlockPhoto] = useState("");
-
   const [rates, setRates] = useState([]);
   const [ratesLoading, setRatesLoading] = useState(false);
+
+  // ⭐ Cart state
+  const [cartMsg, setCartMsg] = useState("");
+  const [cartErr, setCartErr] = useState("");
+  const [cartBusy, setCartBusy] = useState(false);
 
   const calculateMonths = (start, end) => {
     if (!start || !end) return 0;
@@ -74,7 +77,6 @@ export default function Rooms() {
     suffix: selectedPeriod === "night" ? "/night" : "/month",
   };
 
-  // Whether this block uses categories (defaults to true if field is missing)
   const usesCategories = selectedBlock ? selectedBlock.usesCategories !== false : true;
 
   const visibleCategories = rates.map((r) => ({
@@ -83,10 +85,7 @@ export default function Rooms() {
     ...(CATEGORY_DISPLAY[r.category] || { icon: "🏨", color: "#4a90d9", bg: "#e8f4fd", tag: "", desc: "", amenities: [] }),
   }));
 
-  // ⭐ Whole-block uses price/photo pulled directly from the rooms in that block
-  const wholeBlockRate = !usesCategories
-    ? { name: selectedBlock?.name || "Room", price: wholeBlockPrice, photo: wholeBlockPhoto }
-    : null;
+  const wholeBlockRate = !usesCategories ? { name: selectedBlock?.name || "Room", price: 0 } : null;
 
   const stayNights = (() => {
     if (!form.checkIn || !form.checkOut) return 0;
@@ -119,15 +118,12 @@ export default function Rooms() {
     return () => { active = false; };
   }, [form.accommodationType]);
 
-  // ⭐ Fetch rooms for the selected block, and capture the block's real price + photo
   React.useEffect(() => {
     let active = true;
     if (!selectedBlockName) {
       setRoomExamples({});
       setRoomSections({});
       setLocationAddress("");
-      setWholeBlockPrice(0);
-      setWholeBlockPhoto("");
       setRoomsLoading(false);
       return () => {};
     }
@@ -138,8 +134,6 @@ export default function Rooms() {
         const examples = {};
         const sections = {};
         let address = "";
-        let firstPrice = 0;
-        let firstPhoto = "";
         (data || []).forEach((room) => {
           if (room.imageData && !examples[room.category]) examples[room.category] = room.imageData;
           if (room.hostelSection) {
@@ -147,27 +141,45 @@ export default function Rooms() {
             sections[room.category].add(room.hostelSection);
           }
           if (room.address && !address) address = room.address;
-          if (!firstPrice && room.price) firstPrice = Number(room.price);
-          if (!firstPhoto && room.imageData) firstPhoto = room.imageData;
         });
         setRoomExamples(examples);
         setRoomSections(Object.fromEntries(Object.entries(sections).map(([k, v]) => [k, [...v].sort()])));
         setLocationAddress(address);
-        setWholeBlockPrice(firstPrice);
-        setWholeBlockPhoto(firstPhoto);
       })
-      .catch(() => {
-        if (active) {
-          setRoomExamples({});
-          setRoomSections({});
-          setLocationAddress("");
-          setWholeBlockPrice(0);
-          setWholeBlockPhoto("");
-        }
-      })
+      .catch(() => { if (active) { setRoomExamples({}); setRoomSections({}); setLocationAddress(""); } })
       .finally(() => { if (active) setRoomsLoading(false); });
     return () => { active = false; };
   }, [selectedBlockName]);
+
+  // ⭐ Add to cart — requires login + dates
+  const addToCart = async (cat) => {
+    setCartMsg(""); setCartErr("");
+    if (!user) { navigate("/login"); return; }
+    if (!form.checkIn || !form.checkOut || durationUnits <= 0) {
+      setCartErr("Please choose check-in and check-out dates first.");
+      return;
+    }
+    setCartBusy(true);
+    try {
+      await API.post("/cart/items", {
+        category: cat.name,
+        accommodationType: form.accommodationType,
+        blockName: selectedBlockName || undefined,
+        checkIn: form.checkIn,
+        checkOut: form.checkOut,
+        numberOfOccupants: form.numberOfOccupants,
+        occupantNames: form.occupantNames,
+        billingType: selectedBlock?.billingType || "per_month",
+        priceAtAdd: cat.price,
+      });
+      setCartMsg(`${cat.name} added to cart.`);
+      setTimeout(() => setCartMsg(""), 3000);
+    } catch (err) {
+      setCartErr(err.response?.data?.message || "Could not add to cart.");
+    } finally {
+      setCartBusy(false);
+    }
+  };
 
   const handleBook = async (e) => {
     e.preventDefault();
@@ -228,10 +240,40 @@ export default function Rooms() {
           </div>
         )}
 
+        {/* Date pickers — required for cart */}
+        {user && (
+          <div style={{ background: "#fff", borderRadius: "12px", padding: "16px", marginBottom: "20px", border: "1px solid #eee" }}>
+            <p style={{ margin: "0 0 10px", fontWeight: "700", fontSize: "14px" }}>📅 Choose your stay dates to add to cart</p>
+            <div style={{ display: "flex", gap: "12px", flexWrap: "wrap" }}>
+              <div style={{ flex: 1, minWidth: "180px" }}>
+                <label style={styles.label}>Check-in</label>
+                <input type="date" value={form.checkIn} min={new Date().toISOString().split("T")[0]}
+                  onChange={(e) => setForm({ ...form, checkIn: e.target.value })} />
+              </div>
+              <div style={{ flex: 1, minWidth: "180px" }}>
+                <label style={styles.label}>Check-out</label>
+                <input type="date" value={form.checkOut} min={form.checkIn || new Date().toISOString().split("T")[0]}
+                  onChange={(e) => setForm({ ...form, checkOut: e.target.value })} />
+              </div>
+              <div style={{ flex: 1, minWidth: "150px" }}>
+                <label style={styles.label}>Occupants</label>
+                <input type="number" min="1" max="20" value={form.numberOfOccupants}
+                  onChange={(e) => {
+                    const count = Math.min(20, Math.max(1, Number(e.target.value || 1)));
+                    const names = Array.from({ length: count }, (_, i) => form.occupantNames[i] || "");
+                    setForm({ ...form, numberOfOccupants: count, occupantNames: names });
+                  }} />
+              </div>
+            </div>
+          </div>
+        )}
+
+        {cartMsg && <p style={{ color: "#276749", fontSize: "13px", marginBottom: "10px" }}>✅ {cartMsg}</p>}
+        {cartErr && <p style={{ color: "#c53030", fontSize: "13px", marginBottom: "10px" }}>⚠️ {cartErr}</p>}
+
         <div style={{ margin: "0 0 16px", color: "#666", fontSize: "13px" }}>
           {roomsLoading || ratesLoading ? "Loading rooms..." : "Photos show the selected accommodation location. Room numbers are assigned by the admin after payment."}
         </div>
-
         {!ratesLoading && visibleCategories.length === 0 && !wholeBlockRate && (
           <div style={{ ...styles.infoBox, background: "#fff8e6" }}>
             No rooms have been configured for {selectedLocation.label} yet. Please check back soon or choose another configured block.
@@ -239,65 +281,6 @@ export default function Rooms() {
         )}
 
         <div style={styles.grid}>
-          {/* WHOLE-BLOCK MODE: block has no categories → show one card */}
-          {!usesCategories && wholeBlockRate && (
-            <div style={styles.card}>
-              <div style={{ position: "relative", height: "220px", background: "#eee", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                {wholeBlockPhoto ? (
-                  <img
-                    src={wholeBlockPhoto}
-                    alt={`${selectedLocation.label} room`}
-                    style={styles.cardImg}
-                    onError={(e) => { e.target.style.display = "none"; e.target.parentElement.dataset.broken = "true"; }}
-                  />
-                ) : (
-                  <span style={{ fontSize: "42px", color: "#bbb" }}>🏨</span>
-                )}
-                <span style={{ ...styles.cardTag, background: "#b8860b" }}>Available</span>
-                <span style={{ position: "absolute", top: "10px", left: "10px", background: "rgba(0,0,0,.65)", color: "#fff", fontSize: "11px", fontWeight: "700", padding: "4px 9px", borderRadius: "999px" }}>
-                  {form.accommodationType === "ilpd_building" ? "🏛️" : "🏨"} {selectedLocation.label}
-                </span>
-                {locationAddress && (
-                  <span style={{ position: "absolute", bottom: "0", left: "0", right: "0", background: "rgba(0,0,0,.65)", color: "#fff", fontSize: "12px", fontWeight: "600", padding: "6px 10px" }}>
-                    📌 {locationAddress}
-                  </span>
-                )}
-              </div>
-              <div style={styles.cardBody}>
-                <div style={styles.cardTop}>
-                  <span style={{ fontWeight: "700", fontSize: "20px" }}>🏨 {selectedLocation.label}</span>
-                  <span style={{ ...styles.catBadge, background: "#fff8e6", color: "#b8860b" }}>Room</span>
-                </div>
-                <div style={{ display: "flex", flexWrap: "wrap", gap: "6px", margin: "8px 0" }}>
-                  <span style={{ fontSize: "12px", fontWeight: "700", background: "#f3f0ff", color: "#553c9a", padding: "4px 10px", borderRadius: "999px" }}>
-                    🧱 Block: {selectedLocation.label}
-                  </span>
-                </div>
-                <p style={{ color: "#555", fontSize: "14px", lineHeight: "1.6", margin: "10px 0" }}>
-                  Comfortable room in {selectedLocation.label} with all essential amenities for a pleasant stay.
-                </p>
-                <div style={styles.amenitiesRow}>
-                  {["Bed", "TV", "Free WiFi", "Private Bathroom"].map((a) => (
-                    <span key={a} style={styles.amenityTag}>{a}</span>
-                  ))}
-                </div>
-                <div style={styles.cardFooter}>
-                  <div>
-                    <span style={styles.price}>{fmt(wholeBlockRate.price)}</span>
-                    <span style={{ fontSize: "14px", color: "#333", fontWeight: "700" }}>{selectedPeriod === "night" ? "/night" : "/month"}</span>
-                  </div>
-                  <button
-                    onClick={() => { setShowTerms(wholeBlockRate); setTermsAnswer(""); }}
-                    style={styles.bookBtn}
-                  >
-                    Book Now →
-                  </button>
-                </div>
-              </div>
-            </div>
-          )}
-
-          {/* CATEGORY MODE: block uses categories → show one card per category */}
           {usesCategories && visibleCategories.map((cat) => (
             <div key={cat.name} style={styles.card}>
               <div style={{ position: "relative", height: "220px", background: "#eee", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
@@ -306,7 +289,7 @@ export default function Rooms() {
                     src={roomExamples[cat.name] || ROOM_IMAGES[form.accommodationType]?.[cat.name]}
                     alt={`${cat.name} room - ${selectedLocation.label}`}
                     style={styles.cardImg}
-                    onError={(e) => { e.target.style.display = "none"; e.target.parentElement.dataset.broken = "true"; }}
+                    onError={(e) => { e.target.style.display = "none"; }}
                   />
                 ) : (
                   <span style={{ fontSize: "42px", color: "#bbb" }}>🏨</span>
@@ -347,9 +330,19 @@ export default function Rooms() {
                     <span style={styles.price}>{fmt(cat.price)}</span>
                     <span style={{ fontSize: "14px", color: "#333", fontWeight: "700" }}>{selectedPeriod === "night" ? "/night" : "/month"}</span>
                   </div>
+                </div>
+                <div style={{ display: "flex", gap: "8px", marginTop: "12px", flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={() => addToCart(cat)}
+                    disabled={cartBusy}
+                    style={{ flex: 1, background: "#fff", color: "#111", border: "1px solid #ccc", padding: "11px", borderRadius: "8px", cursor: "pointer", fontWeight: "700", fontSize: "14px" }}
+                  >
+                    🛒 Add to Cart
+                  </button>
                   <button
                     onClick={() => { setShowTerms(cat); setTermsAnswer(""); }}
-                    style={styles.bookBtn}
+                    style={{ flex: 1, background: "#b8860b", color: "#fff", border: "none", padding: "11px", borderRadius: "8px", cursor: "pointer", fontWeight: "700", fontSize: "14px" }}
                   >
                     Book Now →
                   </button>
@@ -357,6 +350,44 @@ export default function Rooms() {
               </div>
             </div>
           ))}
+
+          {!usesCategories && wholeBlockRate && (
+            <div style={styles.card}>
+              <div style={{ position: "relative", height: "220px", background: "#eee", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
+                {roomExamples["__whole_block__"] ? (
+                  <img src={roomExamples["__whole_block__"]} alt={selectedLocation.label} style={styles.cardImg} />
+                ) : (
+                  <span style={{ fontSize: "42px", color: "#bbb" }}>🏨</span>
+                )}
+                <span style={{ ...styles.cardTag, background: "#b8860b" }}>Available</span>
+                <span style={{ position: "absolute", top: "10px", left: "10px", background: "rgba(0,0,0,.65)", color: "#fff", fontSize: "11px", fontWeight: "700", padding: "4px 9px", borderRadius: "999px" }}>
+                  {form.accommodationType === "ilpd_building" ? "🏛️" : "🏨"} {selectedLocation.label}
+                </span>
+              </div>
+              <div style={styles.cardBody}>
+                <h3 style={{ margin: "0 0 8px", fontSize: "20px", fontWeight: "700" }}>🏨 {selectedLocation.label}</h3>
+                <p style={{ color: "#555", fontSize: "14px", lineHeight: "1.6", margin: "10px 0" }}>
+                  Comfortable room in {selectedLocation.label} with all essential amenities.
+                </p>
+                <div style={{ display: "flex", gap: "8px", marginTop: "12px", flexWrap: "wrap" }}>
+                  <button
+                    type="button"
+                    onClick={() => addToCart({ name: selectedLocation.label, price: wholeBlockRate.price })}
+                    disabled={cartBusy}
+                    style={{ flex: 1, background: "#fff", color: "#111", border: "1px solid #ccc", padding: "11px", borderRadius: "8px", cursor: "pointer", fontWeight: "700", fontSize: "14px" }}
+                  >
+                    🛒 Add to Cart
+                  </button>
+                  <button
+                    onClick={() => { setShowTerms(wholeBlockRate); setTermsAnswer(""); }}
+                    style={{ flex: 1, background: "#b8860b", color: "#fff", border: "none", padding: "11px", borderRadius: "8px", cursor: "pointer", fontWeight: "700", fontSize: "14px" }}
+                  >
+                    Book Now →
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
         </div>
       </div>
 
@@ -374,14 +405,14 @@ export default function Rooms() {
             <div style={{ fontSize: "13px", color: "#444", lineHeight: "1.7", maxHeight: "330px", overflowY: "auto", paddingRight: "4px" }}>
               <p style={{ marginBottom: "12px" }}><strong>Booking:</strong> Payment is required in full. One client can book for several people.</p>
               <p style={{ marginBottom: "12px" }}><strong>Room:</strong> The admin assigns an available room after payment. A specific room number cannot be guaranteed before allocation.</p>
-              <p style={{ marginBottom: "12px" }}><strong>Check-in & check-out:</strong> The admin records each occupant's arrival and departure. You do not need to submit a request.</p>
-              <p style={{ marginBottom: "12px" }}><strong>Refunds:</strong> Eligible unused days are refunded when a stay is shortened or cancelled, according to the hostel refund policy.</p>
-              <p style={{ marginBottom: "12px" }}><strong>Cancellation:</strong> Client cancellations must be made at least {policy.cancellationDeadlineDays} day{policy.cancellationDeadlineDays === 1 ? "" : "s"} before check-in.</p>
+              <p style={{ marginBottom: "12px" }}><strong>Check-in & check-out:</strong> The admin records each occupant's arrival and departure.</p>
+              <p style={{ marginBottom: "12px" }}><strong>Refunds:</strong> Eligible unused days are refunded according to the hostel refund policy.</p>
+              <p style={{ marginBottom: "12px" }}><strong>Cancellation:</strong> At least {policy.cancellationDeadlineDays} day{policy.cancellationDeadlineDays === 1 ? "" : "s"} before check-in.</p>
               <p style={{ marginBottom: 0 }}><strong>Responsibility:</strong> Guests are responsible for hostel property and respectful conduct.</p>
             </div>
 
             <div style={{ marginTop: "20px", padding: "16px", background: "#f8f9fa", borderRadius: "10px", border: "1px solid #e2e8f0" }}>
-              <p style={{ fontWeight: "700", fontSize: "14px", marginBottom: "12px", color: "#1a1a2e" }}>Do you agree to these terms and conditions?</p>
+              <p style={{ fontWeight: "700", fontSize: "14px", marginBottom: "12px" }}>Do you agree to these terms?</p>
               <div style={{ display: "flex", gap: "24px" }}>
                 <label style={{ display: "flex", alignItems: "center", gap: "8px", cursor: "pointer", fontSize: "14px", fontWeight: "600" }}>
                   <input type="radio" name="terms" value="agree" checked={termsAnswer === "agree"} onChange={(e) => setTermsAnswer(e.target.value)} style={{ width: "16px", height: "16px", accentColor: "#276749" }} />
@@ -393,7 +424,7 @@ export default function Rooms() {
                 </label>
               </div>
               {termsAnswer === "disagree" && (
-                <p style={{ color: "#9b2c2c", fontSize: "13px", marginTop: "10px" }}>You must agree to the terms and conditions to proceed with booking.</p>
+                <p style={{ color: "#9b2c2c", fontSize: "13px", marginTop: "10px" }}>You must agree to proceed.</p>
               )}
             </div>
 
@@ -431,12 +462,12 @@ export default function Rooms() {
 
             <form onSubmit={handleBook}>
               <div style={styles.formRow}>
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: 1, minWidth: "140px" }}>
                   <label style={styles.label}>📅 Check-in Date</label>
                   <input type="date" value={form.checkIn} min={new Date().toISOString().split("T")[0]}
                     onChange={(e) => setForm({ ...form, checkIn: e.target.value })} required />
                 </div>
-                <div style={{ flex: 1 }}>
+                <div style={{ flex: 1, minWidth: "140px" }}>
                   <label style={styles.label}>📅 Check-out Date</label>
                   <input type="date" value={form.checkOut} min={form.checkIn || new Date().toISOString().split("T")[0]}
                     onChange={(e) => setForm({ ...form, checkOut: e.target.value })} required />
@@ -447,7 +478,7 @@ export default function Rooms() {
                 <label style={styles.label}>👥 Number of people</label>
                 <input type="number" min="1" max="20" value={form.numberOfOccupants}
                   onChange={(e) => { const count = Math.min(20, Math.max(1, Number(e.target.value || 1))); const names = Array.from({ length: count }, (_, i) => form.occupantNames[i] || ""); setForm({ ...form, numberOfOccupants: count, occupantNames: names }); }} required />
-                <p style={{ fontSize: "12px", color: "#666", margin: "6px 0 10px" }}>One client can make one booking for several people. Each person will receive a separate room and can leave on a different date.</p>
+                <p style={{ fontSize: "12px", color: "#666", margin: "6px 0 10px" }}>One booking can cover several people.</p>
                 <div style={{ display: "grid", gap: "8px" }}>
                   {form.occupantNames.map((name, i) => (
                     <input key={i} type="text" placeholder={`Person ${i + 1} full name`} value={name}
@@ -471,7 +502,7 @@ export default function Rooms() {
 
               <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
                 <button type="submit" style={styles.payBtn} disabled={loading}>
-                  {loading ? "⏳ Redirecting to payment..." : "💳 Pay & Confirm Booking"}
+                  {loading ? "⏳ Redirecting..." : "💳 Pay & Confirm Booking"}
                 </button>
                 <button type="button" onClick={() => setBooking(null)} style={styles.cancelBtn}>Cancel</button>
               </div>
@@ -503,14 +534,13 @@ const styles = {
   amenityTag: { background: "#f5f5f5", color: "#555", padding: "3px 8px", borderRadius: "4px", fontSize: "11px" },
   cardFooter: { display: "flex", justifyContent: "space-between", alignItems: "center", borderTop: "1px solid #f0f0f0", paddingTop: "14px" },
   price: { fontSize: "24px", fontWeight: "700", color: "#1a1a2e" },
-  bookBtn: { background: "#b8860b", color: "#fff", border: "none", padding: "11px 20px", borderRadius: "8px", cursor: "pointer", fontWeight: "600", fontSize: "14px" },
   overlay: { position: "fixed", inset: 0, background: "rgba(0,0,0,0.65)", display: "flex", alignItems: "center", justifyContent: "center", zIndex: 300, padding: "20px" },
   modal: { background: "#fffdf9", borderRadius: "14px", width: "100%", maxWidth: "500px", maxHeight: "90vh", overflowY: "auto", padding: "24px", border: "1px solid #f0ede6" },
   modalHeader: { display: "flex", justifyContent: "space-between", alignItems: "flex-start", marginBottom: "16px" },
   closeBtn: { background: "#f5f5f5", border: "none", borderRadius: "50%", width: "32px", height: "32px", cursor: "pointer", fontSize: "16px" },
   bookingInfo: { display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", background: "#f9f9f9", borderRadius: "8px", padding: "14px", marginBottom: "14px" },
   infoItem: { display: "flex", gap: "8px", fontSize: "13px", alignItems: "center" },
-  formRow: { display: "flex", gap: "12px" },
+  formRow: { display: "flex", gap: "12px", flexWrap: "wrap" },
   label: { fontSize: "13px", fontWeight: "600", marginBottom: "6px", display: "block", color: "#444" },
   totalBox: { background: "#fff8e6", border: "1px solid #f0d080", borderRadius: "8px", padding: "14px", marginTop: "12px" },
   payBtn: { flex: 1, background: "#b8860b", color: "#fff", border: "none", padding: "13px", borderRadius: "8px", cursor: "pointer", fontWeight: "700", fontSize: "15px" },
