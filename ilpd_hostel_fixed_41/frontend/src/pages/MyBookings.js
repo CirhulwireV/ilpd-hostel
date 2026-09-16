@@ -1,5 +1,6 @@
 import React, { useEffect, useState, useCallback } from "react";
 import { Link, useNavigate } from "react-router-dom";
+import jsPDF from "jspdf";
 import API from "../api/axios";
 
 const fmt = (n) => `${Number(n || 0).toLocaleString()} RWF`;
@@ -45,9 +46,119 @@ function Toast({ message, onClose }) {
   );
 }
 
+// ⭐ Generate and download a formatted PDF for a booking
+function downloadBookingPDF(booking) {
+  const doc = new jsPDF();
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  // Header
+  doc.setFontSize(20);
+  doc.setTextColor(184, 134, 11);
+  doc.setFont(undefined, "bold");
+  doc.text("ILPD HOSTEL", pageWidth / 2, 20, { align: "center" });
+
+  doc.setFontSize(10);
+  doc.setFont(undefined, "normal");
+  doc.setTextColor(80, 80, 80);
+  doc.text("Nyanza, Southern Province, Rwanda", pageWidth / 2, 27, { align: "center" });
+  doc.text("Phone: +250 783 257 155 / +250 780 702 834", pageWidth / 2, 33, { align: "center" });
+  doc.text("Email: info@ilpd.ac.rw", pageWidth / 2, 39, { align: "center" });
+
+  // Divider
+  doc.setDrawColor(184, 134, 11);
+  doc.setLineWidth(0.5);
+  doc.line(20, 46, pageWidth - 20, 46);
+
+  // Title
+  doc.setFontSize(14);
+  doc.setFont(undefined, "bold");
+  doc.setTextColor(26, 26, 46);
+  doc.text("BOOKING RECEIPT", pageWidth / 2, 58, { align: "center" });
+
+  let y = 74;
+  const labelX = 22;
+  const valueX = 80;
+
+  const section = (title) => {
+    doc.setFontSize(11);
+    doc.setFont(undefined, "bold");
+    doc.setTextColor(184, 134, 11);
+    doc.text(title, labelX, y);
+    y += 8;
+    doc.setFont(undefined, "normal");
+    doc.setTextColor(40, 40, 40);
+    doc.setFontSize(11);
+  };
+
+  const line = (label, value) => {
+    doc.setFont(undefined, "bold");
+    doc.text(`${label}:`, labelX, y);
+    doc.setFont(undefined, "normal");
+    const text = String(value ?? "—");
+    const wrapped = doc.splitTextToSize(text, pageWidth - valueX - 20);
+    doc.text(wrapped, valueX, y);
+    y += 7 * wrapped.length;
+  };
+
+  // Booking section
+  section("BOOKING");
+  line("Booking ID", booking._id);
+  line("Status", booking.status);
+  line("Payment", booking.paymentStatus || "pending");
+  line("Booked on", new Date(booking.createdAt).toLocaleString());
+  y += 3;
+
+  // Client section
+  section("CLIENT");
+  line("Name", booking.client?.name);
+  line("Email", booking.client?.email);
+  line("Phone", booking.client?.phone);
+  y += 3;
+
+  // Room section
+  section("ROOM");
+  line("Room number", booking.room?.roomNumber || "Not yet allocated");
+  line("Category", booking.room?.category || booking.category);
+  line("Block", booking.room?.hostelSection || booking.blockName || "—");
+  line("Location", booking.room?.address || "Nyanza, Rwanda");
+  y += 3;
+
+  // Stay section
+  section("STAY");
+  const checkIn = new Date(booking.checkIn).toLocaleDateString();
+  const checkOut = new Date(booking.checkOut).toLocaleDateString();
+  const nights = Math.max(1, Math.ceil((new Date(booking.checkOut) - new Date(booking.checkIn)) / 86400000));
+  const months = Number(booking.billingMonths || 1);
+  const durationText = booking.billingPeriod === "night" ? `${nights} night${nights > 1 ? "s" : ""}` : `${months} month${months > 1 ? "s" : ""}`;
+  line("Check-in", checkIn);
+  line("Check-out", checkOut);
+  line("Duration", durationText);
+  line("Occupants", booking.numberOfOccupants || booking.occupants?.length || 1);
+  line("Total", `${Number(booking.totalPrice || 0).toLocaleString()} RWF`);
+  if (refundedAmount(booking) > 0) {
+    line("Refunded", `${refundedAmount(booking).toLocaleString()} RWF`);
+  }
+
+  // Divider
+  y += 6;
+  doc.setDrawColor(200, 200, 200);
+  doc.line(20, y, pageWidth - 20, y);
+  y += 8;
+
+  // Footer
+  doc.setFontSize(10);
+  doc.setTextColor(120, 120, 120);
+  doc.text("Thank you for choosing ILPD Hostel!", pageWidth / 2, y, { align: "center" });
+  doc.setFontSize(8);
+  doc.text(`Generated on ${new Date().toLocaleString()}`, pageWidth / 2, y + 6, { align: "center" });
+
+  // Save
+  doc.save(`ILPD-Booking-${booking._id}.pdf`);
+}
+
 export default function MyBookings() {
   const navigate = useNavigate();
-  const [confirmDialog, setConfirmDialog] = useState(null); // { message, onConfirm }
+  const [confirmDialog, setConfirmDialog] = useState(null);
   const askConfirm = (message, onConfirm) => setConfirmDialog({ message, onConfirm });
   const [bookings, setBookings] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -119,6 +230,17 @@ export default function MyBookings() {
     }
   };
 
+  // ⭐ Download handler with a small toast confirmation
+  const handleDownload = (booking, e) => {
+    e?.stopPropagation();
+    try {
+      downloadBookingPDF(booking);
+      addToast("Booking PDF downloaded.");
+    } catch (err) {
+      addToast("Could not generate the PDF. Please try again.");
+    }
+  };
+
   const openEdit = (booking, e) => {
     e?.stopPropagation();
     setEditingBooking(booking);
@@ -172,8 +294,6 @@ export default function MyBookings() {
     }
   };
 
-  // Reminders: check-in/check-out approaching or arrived, computed from
-  // whatever is already loaded — no extra request needed.
   const reminders = (() => {
     const now = new Date();
     const daysBetween = (a, b) => Math.ceil((a - b) / 86400000);
@@ -260,7 +380,6 @@ export default function MyBookings() {
 
   return (
     <div className="container" style={{ padding: "40px 20px" }}>
-      {/* Toast stack */}
       <div style={styles.toastStack}>
         {toasts.map(({ id, msg }) => (
           <Toast key={id} message={msg} onClose={() => removeToast(id)} />
@@ -359,6 +478,11 @@ export default function MyBookings() {
                 <span style={{ background: b.paymentStatus === "paid" ? "#c6f6d5" : "#fed7d7", color: b.paymentStatus === "paid" ? "#276749" : "#9b2c2c", padding: "6px 14px", borderRadius: "20px", fontSize: "13px", fontWeight: "600" }}>
                   💳 {b.paymentStatus.charAt(0).toUpperCase() + b.paymentStatus.slice(1)}
                 </span>
+                {/* ⭐ Download PDF button */}
+                <button onClick={(e) => handleDownload(b, e)} title="Download booking PDF"
+                  style={{ background: "none", border: "1px solid #b8860b", color: "#b8860b", borderRadius: "8px", padding: "5px 10px", fontSize: "12px", cursor: "pointer", fontWeight: "700" }}>
+                  📄 Download PDF
+                </button>
                 {["pending", "confirmed"].includes(b.status) && (
                   <button onClick={(e) => cancelBooking(b._id, e)} title="Cancel booking"
                     style={{ background: "none", border: "1px solid #f6ad55", color: "#9c4221", borderRadius: "8px", padding: "5px 10px", fontSize: "12px", cursor: "pointer" }}>
@@ -388,9 +512,6 @@ export default function MyBookings() {
             </div>
           );
 
-          // Group repeat stays in the same room (or same category, if a room
-          // hasn't been assigned yet) so they appear once with an expandable
-          // history, instead of as separate cards each time.
           const groups = new Map();
           for (const b of bookings) {
             const key = b.room?._id ? `room:${b.room._id}` : `cat:${b.category}:${b.accommodationType}`;
@@ -480,7 +601,12 @@ export default function MyBookings() {
           <div className="card" style={styles.modal} onClick={(e) => e.stopPropagation()}>
             <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: "20px" }}>
               <h3>Booking Details</h3>
-              <div style={{ display: "flex", gap: "10px", alignItems: "center" }}>
+              <div style={{ display: "flex", gap: "10px", alignItems: "center", flexWrap: "wrap" }}>
+                {/* ⭐ Download PDF in the details modal too */}
+                <button onClick={(e) => handleDownload(selected, e)}
+                  style={{ background: "none", border: "1px solid #b8860b", color: "#b8860b", borderRadius: "8px", padding: "6px 12px", fontSize: "13px", cursor: "pointer", fontWeight: "700" }}>
+                  📄 Download PDF
+                </button>
                 {["pending", "confirmed"].includes(selected.status) && (
                   <button onClick={(e) => cancelBooking(selected._id, e)}
                     style={{ background: "none", border: "1px solid #f6ad55", color: "#9c4221", borderRadius: "8px", padding: "6px 12px", fontSize: "13px", cursor: "pointer" }}>
