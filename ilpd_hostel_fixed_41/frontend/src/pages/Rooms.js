@@ -46,6 +46,9 @@ export default function Rooms({ user }) {
   const [locationAddress, setLocationAddress] = useState("");
   const [roomsLoading, setRoomsLoading] = useState(false);
 
+  // ⭐ NEW: hold the actual rooms of the selected block so we can read prices per block
+  const [blockRoomsList, setBlockRoomsList] = useState([]);
+
   const [rates, setRates] = useState([]);
   const [ratesLoading, setRatesLoading] = useState(false);
 
@@ -84,14 +87,17 @@ export default function Rooms({ user }) {
     ...(CATEGORY_DISPLAY[r.category] || { icon: "🏨", color: "#4a90d9", bg: "#e8f4fd", tag: "", desc: "", amenities: [] }),
   }));
 
-  // ⭐ FIX: use the underlying real category name (Standard/VIP/VVIP) for the API,
-  //      so the backend can find the room and price. Display still shows block name.
+  // ⭐ FIX: whole-block price comes from the block's OWN rooms, not the global category price.
+  // Akagera rooms = 100,000 → card shows 100,000, not the category's 35,000.
   const wholeBlockRate = !usesCategories
-    ? {
-        name: visibleCategories[0]?.name || "Standard",
-        displayName: selectedBlock?.name || "Room",
-        price: visibleCategories[0]?.price || 0,
-      }
+    ? (() => {
+        const firstRoomWithPrice = blockRoomsList.find((r) => Number(r.price) > 0);
+        return {
+          name: firstRoomWithPrice?.category || "Standard",
+          displayName: selectedBlock?.name || "Room",
+          price: Number(firstRoomWithPrice?.price || 0),
+        };
+      })()
     : null;
 
   const stayNights = (() => {
@@ -125,12 +131,14 @@ export default function Rooms({ user }) {
     return () => { active = false; };
   }, [form.accommodationType]);
 
+  // Fetch the block's actual rooms — also grab prices + photos
   React.useEffect(() => {
     let active = true;
     if (!selectedBlockName) {
       setRoomExamples({});
       setRoomSections({});
       setLocationAddress("");
+      setBlockRoomsList([]);
       setRoomsLoading(false);
       return () => {};
     }
@@ -138,10 +146,13 @@ export default function Rooms({ user }) {
     API.get("/rooms", { params: { hostelSection: selectedBlockName } })
       .then(({ data }) => {
         if (!active) return;
+        const list = Array.isArray(data) ? data : [];
+        setBlockRoomsList(list);
+
         const examples = {};
         const sections = {};
         let address = "";
-        (data || []).forEach((room) => {
+        list.forEach((room) => {
           if (room.imageData && !examples[room.category]) examples[room.category] = room.imageData;
           if (room.images && room.images.length && !examples["__whole_block__"]) examples["__whole_block__"] = room.images[0];
           if (room.imageData && !examples["__whole_block__"]) examples["__whole_block__"] = room.imageData;
@@ -155,7 +166,14 @@ export default function Rooms({ user }) {
         setRoomSections(Object.fromEntries(Object.entries(sections).map(([k, v]) => [k, [...v].sort()])));
         setLocationAddress(address);
       })
-      .catch(() => { if (active) { setRoomExamples({}); setRoomSections({}); setLocationAddress(""); } })
+      .catch(() => {
+        if (active) {
+          setRoomExamples({});
+          setRoomSections({});
+          setLocationAddress("");
+          setBlockRoomsList([]);
+        }
+      })
       .finally(() => { if (active) setRoomsLoading(false); });
     return () => { active = false; };
   }, [selectedBlockName]);
@@ -195,7 +213,6 @@ export default function Rooms({ user }) {
     setLoading(true);
     setError("");
     try {
-      // ⭐ Sends the REAL category name (Standard/VIP/VVIP), not the block name
       const { data } = await API.post("/bookings", {
         category: booking.name || (visibleCategories[0]?.name || "Standard"),
         accommodationType: form.accommodationType,
