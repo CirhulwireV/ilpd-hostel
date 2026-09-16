@@ -16,20 +16,22 @@ export default function BackButton() {
     <button
       onClick={handleBack}
       title="Go back"
+      aria-label="Go back"
       style={{
         position: "fixed",
-        bottom: "24px",      // ← was top
-        right: "24px",       // ← was left
+        bottom: "24px",
+        right: "24px",
         zIndex: 900,
+        width: "44px",
+        height: "44px",
         display: "flex",
         alignItems: "center",
-        gap: "6px",
+        justifyContent: "center",
         background: "rgba(26,26,46,0.92)",
         color: "#fff",
         border: "1px solid rgba(184,134,11,0.6)",
-        borderRadius: "999px",
-        padding: "10px 16px",
-        fontSize: "13px",
+        borderRadius: "50%",
+        fontSize: "20px",
         fontWeight: "600",
         cursor: "pointer",
         boxShadow: "0 4px 14px rgba(0,0,0,0.25)",
@@ -37,8 +39,7 @@ export default function BackButton() {
       onMouseEnter={(e) => { e.currentTarget.style.background = "#b8860b"; }}
       onMouseLeave={(e) => { e.currentTarget.style.background = "rgba(26,26,46,0.92)"; }}
     >
-      <span style={{ fontSize: "16px", lineHeight: 1 }}>←</span>
-      <span>Back</span>
+      ←
     </button>
   );
 }
