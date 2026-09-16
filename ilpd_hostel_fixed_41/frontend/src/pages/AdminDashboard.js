@@ -73,6 +73,9 @@ export default function AdminDashboard() {
   const [clientError, setClientError] = useState("");
   const [reportError, setReportError] = useState("");
 
+  // ⭐ Client details modal state
+  const [viewingClient, setViewingClient] = useState(null);
+
   const [weeklyReport, setWeeklyReport] = useState(null);
   const [monthlyReport, setMonthlyReport] = useState(null);
   const [monthlyReportError, setMonthlyReportError] = useState("");
@@ -133,7 +136,6 @@ export default function AdminDashboard() {
   const [newSurveyQuestion, setNewSurveyQuestion] = useState("");
   const [surveyQuestionMsg, setSurveyQuestionMsg] = useState("");
 
-  // ⭐ NEW — Landing page hero images
   const [heroImages, setHeroImages] = useState([]);
   const [heroSaving, setHeroSaving] = useState(false);
   const [heroMsg, setHeroMsg] = useState("");
@@ -164,7 +166,6 @@ export default function AdminDashboard() {
     API.get("/hostel-structure/blocks?activeOnly=false").then(({ data }) => setBlocks(data)).catch(() => {});
     API.get("/hostel-structure/categories?activeOnly=false").then(({ data }) => setCategories(data)).catch(() => {});
     API.get("/surveys/questions/all").then(({ data }) => setSurveyQuestions(data)).catch(() => {});
-    // ⭐ NEW
     API.get("/settings/hero").then(({ data }) => setHeroImages(data.images || [])).catch(() => {});
   }, []);
 
@@ -204,20 +205,11 @@ export default function AdminDashboard() {
     });
   }, [blocks, categories]);
 
-  // ⭐ NEW — Hero image handlers
   const uploadHeroImage = async (file) => {
     if (!file) return;
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      setHeroErr("Please choose a JPG, PNG, or WebP image.");
-      return;
-    }
-    if (file.size > 8 * 1024 * 1024) {
-      setHeroErr("Image must be 8 MB or smaller.");
-      return;
-    }
-    setHeroUploading(true);
-    setHeroErr("");
-    setHeroMsg("");
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) { setHeroErr("Please choose a JPG, PNG, or WebP image."); return; }
+    if (file.size > 8 * 1024 * 1024) { setHeroErr("Image must be 8 MB or smaller."); return; }
+    setHeroUploading(true); setHeroErr(""); setHeroMsg("");
     try {
       const formData = new FormData();
       formData.append("images", file);
@@ -227,30 +219,20 @@ export default function AdminDashboard() {
       setHeroMsg("Image uploaded. Don't forget to click Save.");
     } catch (err) {
       setHeroErr(err.response?.data?.error || "Upload failed.");
-    } finally {
-      setHeroUploading(false);
-    }
+    } finally { setHeroUploading(false); }
   };
 
   const saveHeroImages = async () => {
-    setHeroSaving(true);
-    setHeroErr("");
-    setHeroMsg("");
+    setHeroSaving(true); setHeroErr(""); setHeroMsg("");
     try {
       const { data } = await API.put("/settings/hero", { images: heroImages });
       setHeroImages(data.images || []);
       setHeroMsg("Saved successfully.");
-    } catch (err) {
-      setHeroErr(err.response?.data?.error || "Could not save.");
-    } finally {
-      setHeroSaving(false);
-    }
+    } catch (err) { setHeroErr(err.response?.data?.error || "Could not save."); }
+    finally { setHeroSaving(false); }
   };
 
-  const removeHeroImage = (i) => {
-    setHeroImages((prev) => prev.filter((_, idx) => idx !== i));
-    setHeroMsg("Removed. Don't forget to click Save.");
-  };
+  const removeHeroImage = (i) => { setHeroImages((prev) => prev.filter((_, idx) => idx !== i)); setHeroMsg("Removed. Don't forget to click Save."); };
 
   const moveHeroImage = (i, dir) => {
     setHeroImages((prev) => {
@@ -262,9 +244,7 @@ export default function AdminDashboard() {
     });
   };
 
-  const refreshRooms = async () => {
-    try { const { data } = await API.get("/rooms"); setRooms(data); } catch (_) {}
-  };
+  const refreshRooms = async () => { try { const { data } = await API.get("/rooms"); setRooms(data); } catch (_) {} };
 
   const refreshStructure = async () => {
     try {
@@ -275,9 +255,7 @@ export default function AdminDashboard() {
       ]);
       setBlocks(blocksRes.data || []);
       setCategories(categoriesRes.data || []);
-    } catch (err) {
-      setStructureError(err.response?.data?.message || "Could not load hostel structure.");
-    }
+    } catch (err) { setStructureError(err.response?.data?.message || "Could not load hostel structure."); }
   };
 
   const jumpToBooking = (booking, subTab) => {
@@ -285,18 +263,12 @@ export default function AdminDashboard() {
   };
 
   const openAllocation = async (booking) => {
-    setBookingError(""); setBookingMsg("");
-    setAllocatingId(booking._id); setAllocateRoomId([]);
+    setBookingError(""); setBookingMsg(""); setAllocatingId(booking._id); setAllocateRoomId([]);
     try {
-      const { data } = await API.get("/rooms/available-for-booking", {
-        params: { category: booking.category, accommodationType: booking.accommodationType || "outside_hostel", checkIn: booking.checkIn, checkOut: booking.checkOut },
-      });
+      const { data } = await API.get("/rooms/available-for-booking", { params: { category: booking.category, accommodationType: booking.accommodationType || "outside_hostel", checkIn: booking.checkIn, checkOut: booking.checkOut } });
       setAllocationRooms(data);
       if (!data.length) setBookingError("No room is available for these booking dates.");
-    } catch (err) {
-      setAllocationRooms([]);
-      setBookingError(err.response?.data?.message || "Unable to load available rooms.");
-    }
+    } catch (err) { setAllocationRooms([]); setBookingError(err.response?.data?.message || "Unable to load available rooms."); }
   };
 
   const allocateRoom = async (id) => {
@@ -307,9 +279,7 @@ export default function AdminDashboard() {
       setAllocatingId(null); setAllocateRoomId([]);
       setBookingMsg("Room allocated successfully."); setBookingError("");
       await refreshRooms();
-    } catch (err) {
-      setBookingError(err.response?.data?.message || "Unable to allocate room.");
-    }
+    } catch (err) { setBookingError(err.response?.data?.message || "Unable to allocate room."); }
   };
 
   const cancelBooking = async (id) => {
@@ -318,9 +288,7 @@ export default function AdminDashboard() {
       setBookings((prev) => prev.filter((b) => b._id !== id));
       setBookingMsg(data.message); setBookingError("");
       await refreshRooms();
-    } catch (err) {
-      setBookingError(err.response?.data?.message || "Unable to cancel booking.");
-    }
+    } catch (err) { setBookingError(err.response?.data?.message || "Unable to cancel booking."); }
   };
 
   const recordCheckin = (id) => {
@@ -371,14 +339,9 @@ export default function AdminDashboard() {
   const openReallocate = async (booking) => {
     setBookingError(""); setBookingMsg(""); setReallocatingId(booking._id); setReallocateRoomId("");
     try {
-      const { data } = await API.get("/rooms/available-for-booking", {
-        params: { category: booking.category, accommodationType: booking.accommodationType || "outside_hostel", checkIn: booking.checkIn, checkOut: booking.checkOut },
-      });
+      const { data } = await API.get("/rooms/available-for-booking", { params: { category: booking.category, accommodationType: booking.accommodationType || "outside_hostel", checkIn: booking.checkIn, checkOut: booking.checkOut } });
       setReallocateRooms(data.filter((r) => String(r._id) !== String(booking.room?._id || booking.room)));
-    } catch (err) {
-      setReallocateRooms([]);
-      setBookingError(err.response?.data?.message || "Unable to load available rooms.");
-    }
+    } catch (err) { setReallocateRooms([]); setBookingError(err.response?.data?.message || "Unable to load available rooms."); }
   };
 
   const confirmReallocate = async (bookingId) => {
@@ -431,29 +394,20 @@ export default function AdminDashboard() {
       `Permanently delete ${ids.length} room${ids.length > 1 ? "s" : ""}?\n\n${names}\n\nThis cannot be undone.`,
       async () => {
         try {
-          for (const id of ids) {
-            await API.delete(`/rooms/${id}`);
-          }
+          for (const id of ids) { await API.delete(`/rooms/${id}`); }
           setRooms((prev) => prev.filter((r) => !ids.includes(r._id)));
           setMsg(`${ids.length} room${ids.length > 1 ? "s" : ""} deleted.`);
           setAddRoomError("");
           setDeleteRoomIds([]);
-        } catch (err) {
-          setAddRoomError(err.response?.data?.message || "Could not delete one or more rooms.");
-          await refreshRooms();
-        }
+        } catch (err) { setAddRoomError(err.response?.data?.message || "Could not delete one or more rooms."); await refreshRooms(); }
       }
     );
   };
 
   const readRoomImage = (file, callback) => {
     if (!file) return;
-    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) {
-      setAddRoomError("Please choose a JPG, PNG, or WebP image."); return;
-    }
-    if (file.size > 3 * 1024 * 1024) {
-      setAddRoomError("Image must be 3 MB or smaller."); return;
-    }
+    if (!["image/jpeg", "image/png", "image/webp"].includes(file.type)) { setAddRoomError("Please choose a JPG, PNG, or WebP image."); return; }
+    if (file.size > 3 * 1024 * 1024) { setAddRoomError("Image must be 3 MB or smaller."); return; }
     const reader = new FileReader();
     reader.onload = () => callback(String(reader.result), file.name);
     reader.onerror = () => setAddRoomError("Unable to read the selected image.");
@@ -464,16 +418,10 @@ export default function AdminDashboard() {
     const list = Array.from(files || []);
     if (!list.length) return;
     setAddRoomError("");
-    list.forEach((file) => {
-      readRoomImage(file, (imageData) => {
-        setNewRoom((r) => ({ ...r, images: [...r.images, imageData] }));
-      });
-    });
+    list.forEach((file) => { readRoomImage(file, (imageData) => { setNewRoom((r) => ({ ...r, images: [...r.images, imageData] })); }); });
   };
 
-  const removeRoomPhoto = (index) => {
-    setNewRoom((r) => ({ ...r, images: r.images.filter((_, i) => i !== index) }));
-  };
+  const removeRoomPhoto = (index) => { setNewRoom((r) => ({ ...r, images: r.images.filter((_, i) => i !== index) })); };
 
   const uploadRoomPhotosToCloudinary = async (imageDataUrls) => {
     if (!imageDataUrls?.length) return [];
@@ -519,9 +467,8 @@ export default function AdminDashboard() {
       setNewRoom({ roomNumber: "", category: "", accommodationType: "outside_hostel", hostelSection: "", price: "", address: "Nyanza, Southern Province, Rwanda", images: [], imageData: "", imageName: "" });
       setAddRoomAttempted(false);
       setShowAddRoom(false);
-    } catch (err) {
-      setAddRoomError(err.response?.data?.message || "Could not create room.");
-    } finally { setAddingRoom(false); }
+    } catch (err) { setAddRoomError(err.response?.data?.message || "Could not create room."); }
+    finally { setAddingRoom(false); }
   };
 
   const createBulkRooms = async () => {
@@ -537,14 +484,7 @@ export default function AdminDashboard() {
     try {
       const numbers = bulkRoomNumbers.split(",").map((n) => n.trim()).filter(Boolean);
       const images = await uploadRoomPhotosToCloudinary(newRoom.images);
-      const payload = {
-        category: newRoom.category || "Standard",
-        accommodationType: newRoom.accommodationType,
-        hostelSection: newRoom.hostelSection || undefined,
-        price: Number(newRoom.price),
-        address: newRoom.address,
-        images,
-      };
+      const payload = { category: newRoom.category || "Standard", accommodationType: newRoom.accommodationType, hostelSection: newRoom.hostelSection || undefined, price: Number(newRoom.price), address: newRoom.address, images };
       if (numbers.length) payload.roomNumbers = numbers;
       else {
         if (!bulkStartNumber || !bulkCount) { setAddRoomError("Enter start number and count."); setBulkCreating(false); return; }
@@ -559,9 +499,8 @@ export default function AdminDashboard() {
       setNewRoom({ roomNumber: "", category: "", accommodationType: "outside_hostel", hostelSection: "", price: "", address: "Nyanza, Southern Province, Rwanda", images: [], imageData: "", imageName: "" });
       setAddRoomAttempted(false);
       setShowAddRoom(false); setBulkMode(false);
-    } catch (err) {
-      setAddRoomError(err.response?.data?.message || "Unable to create rooms.");
-    } finally { setBulkCreating(false); }
+    } catch (err) { setAddRoomError(err.response?.data?.message || "Unable to create rooms."); }
+    finally { setBulkCreating(false); }
   };
 
   const checkRoomHealth = async (dryRun) => {
@@ -570,22 +509,13 @@ export default function AdminDashboard() {
       const { data } = await API.post(`/rooms/health-check?dryRun=${dryRun}`);
       setHealthResult(data);
       if (!dryRun) await refreshRooms();
-    } catch (err) {
-      setHealthResult({ message: err.response?.data?.message || "Could not check room health.", duplicateGroupsFound: 0 });
-    } finally { setHealthChecking(false); }
+    } catch (err) { setHealthResult({ message: err.response?.data?.message || "Could not check room health.", duplicateGroupsFound: 0 }); }
+    finally { setHealthChecking(false); }
   };
 
   const openEditRoom = (room) => {
     setEditingRoom(room);
-    setEditRoomForm({
-      roomNumber: room.roomNumber,
-      category: room.category,
-      hostelSection: room.hostelSection || "",
-      price: room.price,
-      address: room.address || "",
-      description: room.description || "",
-      active: room.active !== false,
-    });
+    setEditRoomForm({ roomNumber: room.roomNumber, category: room.category, hostelSection: room.hostelSection || "", price: room.price, address: room.address || "", description: room.description || "", active: room.active !== false });
     setEditRoomError("");
   };
 
@@ -596,27 +526,18 @@ export default function AdminDashboard() {
       setRooms((prev) => prev.map((r) => (r._id === data._id ? data : r)));
       setMsg(`Room ${data.roomNumber} updated.`);
       setEditingRoom(null);
-    } catch (err) {
-      setEditRoomError(err.response?.data?.message || "Could not save room.");
-    } finally { setEditRoomSaving(false); }
+    } catch (err) { setEditRoomError(err.response?.data?.message || "Could not save room."); }
+    finally { setEditRoomSaving(false); }
   };
 
   const createBlock = async () => {
     if (!newBlockName.trim()) { setBlockMsg("Please enter a block name."); return; }
     setBlockMsg("");
     try {
-      const { data } = await API.post("/hostel-structure/blocks", {
-        name: newBlockName.trim(),
-        accommodationType: newBlockType,
-        billingType: newBlockBillingType === "night" ? "per_night" : "per_month",
-        usesCategories: newBlockUsesCategories,
-        description: "",
-      });
+      const { data } = await API.post("/hostel-structure/blocks", { name: newBlockName.trim(), accommodationType: newBlockType, billingType: newBlockBillingType === "night" ? "per_night" : "per_month", usesCategories: newBlockUsesCategories, description: "" });
       setBlocks((prev) => [...prev, data]);
       setBlockMsg(`Block "${data.name}" created successfully.`);
-      setNewBlockName("");
-      setNewBlockBillingType("month");
-      setNewBlockUsesCategories(true);
+      setNewBlockName(""); setNewBlockBillingType("month"); setNewBlockUsesCategories(true);
       API.get("/rooms/blocks").then(({ data: b }) => setKnownBlocks(b)).catch(() => {});
     } catch (err) { setBlockMsg(err.response?.data?.message || "Could not create block."); }
   };
@@ -624,10 +545,7 @@ export default function AdminDashboard() {
   const saveBlock = async () => {
     setStructureError(""); setStructureMsg("");
     try {
-      const payload = {
-        ...blockForm,
-        billingType: blockForm.billingType === "night" ? "per_night" : "per_month",
-      };
+      const payload = { ...blockForm, billingType: blockForm.billingType === "night" ? "per_night" : "per_month" };
       if (editingBlock) {
         const { data } = await API.put(`/hostel-structure/blocks/${editingBlock._id}`, payload);
         setBlocks((prev) => prev.map((b) => (b._id === data._id ? data : b)));
@@ -775,11 +693,7 @@ export default function AdminDashboard() {
   const deleteRoomOptions = rooms
     .slice()
     .sort((a, b) => (a.roomNumber || "").localeCompare(b.roomNumber || "", undefined, { numeric: true }))
-    .map((r) => ({
-      value: r._id,
-      label: `Room ${r.roomNumber}${r.category ? ` — ${r.category}` : ""}`,
-      group: r.hostelSection || "Unassigned",
-    }));
+    .map((r) => ({ value: r._id, label: `Room ${r.roomNumber}${r.category ? ` — ${r.category}` : ""}`, group: r.hostelSection || "Unassigned" }));
 
   const filteredConcerns = concerns.filter((c) =>
     c.subject?.toLowerCase().includes(search.toLowerCase()) ||
@@ -793,6 +707,23 @@ export default function AdminDashboard() {
     s.client?.email?.toLowerCase().includes(search.toLowerCase()) ||
     s.comments?.toLowerCase().includes(search.toLowerCase())
   );
+
+  // ⭐ Client search — searches across ALL user fields
+  const filteredClients = clients.filter((c) => {
+    const q = search.toLowerCase().trim();
+    if (!q) return true;
+    return (
+      c.name?.toLowerCase().includes(q) ||
+      c.email?.toLowerCase().includes(q) ||
+      c.phone?.toLowerCase().includes(q) ||
+      c.nationalIdOrPassport?.toLowerCase().includes(q) ||
+      c.nationality?.toLowerCase().includes(q) ||
+      c.position?.toLowerCase().includes(q) ||
+      c.addressOrInstitution?.toLowerCase().includes(q) ||
+      c.purposeOfVisit?.toLowerCase().includes(q) ||
+      c.role?.toLowerCase().includes(q)
+    );
+  });
     return (
     <div className="container" style={{ padding: "40px 20px" }}>
       <div style={{ marginBottom: "24px" }}>
@@ -1308,13 +1239,7 @@ export default function AdminDashboard() {
                         <button className="btn btn-secondary" style={{ padding: "4px 8px", fontSize: "11px", background: "#e2e8f0" }}
                           onClick={() => {
                             setEditingBlock(block);
-                            setBlockForm({
-                              name: block.name,
-                              accommodationType: block.accommodationType || "outside_hostel",
-                              usesCategories: block.usesCategories !== false,
-                              description: block.description || "",
-                              billingType: block.billingType === "per_night" ? "night" : "month",
-                            });
+                            setBlockForm({ name: block.name, accommodationType: block.accommodationType || "outside_hostel", usesCategories: block.usesCategories !== false, description: block.description || "", billingType: block.billingType === "per_night" ? "night" : "month" });
                           }}>✎ Edit</button>
                         <button className="btn btn-secondary"
                           style={{ padding: "4px 8px", fontSize: "11px", background: block.active !== false ? "#fefcbf" : "#c6f6d5" }}
@@ -1394,53 +1319,29 @@ export default function AdminDashboard() {
                     onChange={(e) => {
                       const block = blocks.find((b) => b.name === e.target.value);
                       const usesCats = block ? block.usesCategories !== false : true;
-                      setNewRoom((r) => ({
-                        ...r,
-                        hostelSection: e.target.value,
-                        accommodationType: block?.accommodationType || r.accommodationType,
-                        category: usesCats ? r.category : "Standard",
-                      }));
+                      setNewRoom((r) => ({ ...r, hostelSection: e.target.value, accommodationType: block?.accommodationType || r.accommodationType, category: usesCats ? r.category : "Standard" }));
                     }}
-                    style={{
-                      width: "250px",
-                      marginBottom: 0,
-                      border: addRoomAttempted && !newRoom.hostelSection ? "2px solid #c53030" : "1px solid #ddd",
-                    }}
+                    style={{ width: "250px", marginBottom: 0, border: addRoomAttempted && !newRoom.hostelSection ? "2px solid #c53030" : "1px solid #ddd" }}
                     disabled={!blocks.length}>
                     <option value="">{blocks.length ? "-- Select a Block --" : "No blocks configured"}</option>
-                    {blocks.filter((b) => b.active !== false).map((b) => (
-                      <option key={b._id} value={b.name}>{b.name}</option>
-                    ))}
+                    {blocks.filter((b) => b.active !== false).map((b) => (<option key={b._id} value={b.name}>{b.name}</option>))}
                   </select>
-                  {addRoomAttempted && !newRoom.hostelSection && (
-                    <div style={{ fontSize: "11px", color: "#c53030", marginTop: "2px" }}>Required</div>
-                  )}
+                  {addRoomAttempted && !newRoom.hostelSection && <div style={{ fontSize: "11px", color: "#c53030", marginTop: "2px" }}>Required</div>}
                 </div>
                 {selectedBlockUsesCategories ? (
                   <div>
                     <label style={{ display: "block", fontSize: "12px", marginBottom: "4px" }}>Category *</label>
-                    <select
-                      value={newRoom.category}
-                      onChange={(e) => setNewRoom((r) => ({ ...r, category: e.target.value }))}
-                      style={{
-                        width: "130px",
-                        marginBottom: 0,
-                        border: addRoomAttempted && !newRoom.category ? "2px solid #c53030" : "1px solid #ddd",
-                      }}
-                    >
+                    <select value={newRoom.category} onChange={(e) => setNewRoom((r) => ({ ...r, category: e.target.value }))}
+                      style={{ width: "130px", marginBottom: 0, border: addRoomAttempted && !newRoom.category ? "2px solid #c53030" : "1px solid #ddd" }}>
                       <option value="">-- Select --</option>
                       {categories.map((c) => <option key={c._id || c.name} value={c.name}>{c.name}</option>)}
                     </select>
-                    {addRoomAttempted && !newRoom.category && (
-                      <div style={{ fontSize: "11px", color: "#c53030", marginTop: "2px" }}>Required</div>
-                    )}
+                    {addRoomAttempted && !newRoom.category && <div style={{ fontSize: "11px", color: "#c53030", marginTop: "2px" }}>Required</div>}
                   </div>
                 ) : (
                   <div>
                     <label style={{ display: "block", fontSize: "12px", marginBottom: "4px" }}>Category</label>
-                    <div style={{ padding: "8px 12px", background: "#f0f0f0", borderRadius: "4px", fontSize: "13px", color: "#666", width: "130px", textAlign: "center" }}>
-                      Not used
-                    </div>
+                    <div style={{ padding: "8px 12px", background: "#f0f0f0", borderRadius: "4px", fontSize: "13px", color: "#666", width: "130px", textAlign: "center" }}>Not used</div>
                   </div>
                 )}
                 <div>
@@ -1449,19 +1350,8 @@ export default function AdminDashboard() {
                     <input value={bulkRoomNumbers} onChange={(e) => setBulkRoomNumbers(e.target.value)} placeholder="101, 102, 103 (optional)" style={{ width: "230px", marginBottom: 0 }} />
                   ) : (
                     <>
-                      <input
-                        value={newRoom.roomNumber}
-                        onChange={(e) => setNewRoom((r) => ({ ...r, roomNumber: e.target.value }))}
-                        placeholder="e.g. 101"
-                        style={{
-                          width: "140px",
-                          marginBottom: 0,
-                          border: addRoomAttempted && !newRoom.roomNumber.trim() ? "2px solid #c53030" : "1px solid #ddd",
-                        }}
-                      />
-                      {addRoomAttempted && !newRoom.roomNumber.trim() && (
-                        <div style={{ fontSize: "11px", color: "#c53030", marginTop: "2px" }}>Required</div>
-                      )}
+                      <input value={newRoom.roomNumber} onChange={(e) => setNewRoom((r) => ({ ...r, roomNumber: e.target.value }))} placeholder="e.g. 101" style={{ width: "140px", marginBottom: 0, border: addRoomAttempted && !newRoom.roomNumber.trim() ? "2px solid #c53030" : "1px solid #ddd" }} />
+                      {addRoomAttempted && !newRoom.roomNumber.trim() && <div style={{ fontSize: "11px", color: "#c53030", marginTop: "2px" }}>Required</div>}
                     </>
                   )}
                 </div>
@@ -1479,62 +1369,26 @@ export default function AdminDashboard() {
                 )}
                 <div>
                   <label style={{ display: "block", fontSize: "12px", marginBottom: "4px" }}>Price (RWF) *</label>
-                  <input
-                    type="number"
-                    min="1"
-                    value={newRoom.price}
-                    onChange={(e) => setNewRoom((r) => ({ ...r, price: e.target.value }))}
-                    placeholder="e.g. 35000"
-                    style={{
-                      width: "160px",
-                      marginBottom: 0,
-                      border: addRoomAttempted && (!newRoom.price || Number(newRoom.price) <= 0) ? "2px solid #c53030" : "1px solid #ddd",
-                    }}
-                  />
-                  {addRoomAttempted && (!newRoom.price || Number(newRoom.price) <= 0) && (
-                    <div style={{ fontSize: "11px", color: "#c53030", marginTop: "2px" }}>Required</div>
-                  )}
+                  <input type="number" min="1" value={newRoom.price} onChange={(e) => setNewRoom((r) => ({ ...r, price: e.target.value }))} placeholder="e.g. 35000" style={{ width: "160px", marginBottom: 0, border: addRoomAttempted && (!newRoom.price || Number(newRoom.price) <= 0) ? "2px solid #c53030" : "1px solid #ddd" }} />
+                  {addRoomAttempted && (!newRoom.price || Number(newRoom.price) <= 0) && <div style={{ fontSize: "11px", color: "#c53030", marginTop: "2px" }}>Required</div>}
                 </div>
                 <div>
                   <label style={{ display: "block", fontSize: "12px", marginBottom: "4px" }}>Location *</label>
-                  <input
-                    value={newRoom.address}
-                    onChange={(e) => setNewRoom((r) => ({ ...r, address: e.target.value }))}
-                    placeholder="e.g. Nyanza, Southern Province, Rwanda"
-                    style={{
-                      width: "300px",
-                      marginBottom: 0,
-                      border: addRoomAttempted && !newRoom.address.trim() ? "2px solid #c53030" : "1px solid #ddd",
-                    }}
-                  />
-                  {addRoomAttempted && !newRoom.address.trim() && (
-                    <div style={{ fontSize: "11px", color: "#c53030", marginTop: "2px" }}>Required</div>
-                  )}
+                  <input value={newRoom.address} onChange={(e) => setNewRoom((r) => ({ ...r, address: e.target.value }))} placeholder="e.g. Nyanza, Southern Province, Rwanda" style={{ width: "300px", marginBottom: 0, border: addRoomAttempted && !newRoom.address.trim() ? "2px solid #c53030" : "1px solid #ddd" }} />
+                  {addRoomAttempted && !newRoom.address.trim() && <div style={{ fontSize: "11px", color: "#c53030", marginTop: "2px" }}>Required</div>}
                 </div>
                 <div>
-                  <label style={{ display: "block", fontSize: "12px", marginBottom: "4px" }}>
-                    Room photos * <span style={{ color: "#666", fontWeight: "400" }}>(at least 1)</span>
-                  </label>
-                  <input type="file" accept="image/jpeg,image/png,image/webp" multiple
-                    onChange={(e) => { addRoomPhotos(e.target.files); e.target.value = ""; }} style={{ width: "280px", marginBottom: 0 }} />
-                  {newRoom.images.length === 0 && addRoomAttempted && (
-                    <div style={{ fontSize: "11px", color: "#c53030", marginTop: "4px" }}>
-                      ⚠️ At least 1 photo required
-                    </div>
-                  )}
-                  {newRoom.images.length > 0 && (
-                    <div style={{ fontSize: "11px", color: "#276749", marginTop: "4px" }}>
-                      ✅ {newRoom.images.length} photo{newRoom.images.length > 1 ? "s" : ""} added
-                    </div>
-                  )}
+                  <label style={{ display: "block", fontSize: "12px", marginBottom: "4px" }}>Room photos * <span style={{ color: "#666", fontWeight: "400" }}>(at least 1)</span></label>
+                  <input type="file" accept="image/jpeg,image/png,image/webp" multiple onChange={(e) => { addRoomPhotos(e.target.files); e.target.value = ""; }} style={{ width: "280px", marginBottom: 0 }} />
+                  {newRoom.images.length === 0 && addRoomAttempted && (<div style={{ fontSize: "11px", color: "#c53030", marginTop: "4px" }}>⚠️ At least 1 photo required</div>)}
+                  {newRoom.images.length > 0 && (<div style={{ fontSize: "11px", color: "#276749", marginTop: "4px" }}>✅ {newRoom.images.length} photo{newRoom.images.length > 1 ? "s" : ""} added</div>)}
                 </div>
                 {newRoom.images.length > 0 && (
                   <div style={{ display: "flex", gap: "8px", flexWrap: "wrap" }}>
                     {newRoom.images.map((img, i) => (
                       <div key={i} style={{ position: "relative" }}>
                         <img src={img} alt={`Preview ${i + 1}`} style={{ width: "70px", height: "60px", objectFit: "cover", borderRadius: "8px", border: "1px solid #ddd" }} />
-                        <button type="button" onClick={() => removeRoomPhoto(i)}
-                          style={{ position: "absolute", top: "-6px", right: "-6px", background: "#c53030", color: "#fff", border: "none", borderRadius: "50%", width: "18px", height: "18px", fontSize: "11px", cursor: "pointer", lineHeight: "18px", padding: 0 }}>✕</button>
+                        <button type="button" onClick={() => removeRoomPhoto(i)} style={{ position: "absolute", top: "-6px", right: "-6px", background: "#c53030", color: "#fff", border: "none", borderRadius: "50%", width: "18px", height: "18px", fontSize: "11px", cursor: "pointer", lineHeight: "18px", padding: 0 }}>✕</button>
                       </div>
                     ))}
                   </div>
@@ -1545,58 +1399,21 @@ export default function AdminDashboard() {
                 <button className="btn btn-secondary" type="button" onClick={() => { setShowAddRoom(false); setAddRoomAttempted(false); setAddRoomError(""); }}>Cancel</button>
               </div>
               {addRoomError && (
-                <div
-                  ref={(el) => { if (el) el.scrollIntoView({ behavior: "smooth", block: "center" }); }}
-                  style={{
-                    color: "#c53030",
-                    fontSize: "14px",
-                    fontWeight: "700",
-                    marginTop: "12px",
-                    padding: "10px 14px",
-                    background: "#fff5f5",
-                    border: "1px solid #fed7d7",
-                    borderRadius: "8px",
-                  }}
-                >
+                <div ref={(el) => { if (el) el.scrollIntoView({ behavior: "smooth", block: "center" }); }} style={{ color: "#c53030", fontSize: "14px", fontWeight: "700", marginTop: "12px", padding: "10px 14px", background: "#fff5f5", border: "1px solid #fed7d7", borderRadius: "8px" }}>
                   ⚠️ {addRoomError}
                 </div>
               )}
 
               <div style={{ marginTop: "20px", padding: "16px", background: "#fff5f5", border: "1px solid #fed7d7", borderRadius: "10px" }}>
                 <h4 style={{ margin: "0 0 6px", color: "#9b2c2c", fontSize: "15px" }}>🗑️ Delete Rooms</h4>
-                <p style={{ margin: "0 0 12px", color: "#666", fontSize: "12px" }}>
-                  Click the dropdown to pick rooms. Check rooms in multiple blocks at once.
-                </p>
+                <p style={{ margin: "0 0 12px", color: "#666", fontSize: "12px" }}>Click the dropdown to pick rooms. Check rooms in multiple blocks at once.</p>
                 <div style={{ display: "flex", gap: "10px", flexWrap: "wrap", alignItems: "flex-start" }}>
-                  <MultiSelectDropdown
-                    options={deleteRoomOptions}
-                    value={deleteRoomIds}
-                    onChange={setDeleteRoomIds}
-                    placeholder="Select rooms to delete"
-                    emptyText="No rooms yet"
-                    width="340px"
-                  />
+                  <MultiSelectDropdown options={deleteRoomOptions} value={deleteRoomIds} onChange={setDeleteRoomIds} placeholder="Select rooms to delete" emptyText="No rooms yet" width="340px" />
                   <div style={{ display: "flex", flexDirection: "column", gap: "8px" }}>
-                    <button
-                      className="btn btn-danger"
-                      type="button"
-                      onClick={() => {
-                        if (!deleteRoomIds.length) {
-                          setAddRoomError("Select at least one room to delete.");
-                          return;
-                        }
-                        deleteRooms(deleteRoomIds);
-                      }}
-                    >
+                    <button className="btn btn-danger" type="button" onClick={() => { if (!deleteRoomIds.length) { setAddRoomError("Select at least one room to delete."); return; } deleteRooms(deleteRoomIds); }}>
                       🗑️ Delete Selected ({deleteRoomIds.length})
                     </button>
-                    <button
-                      className="btn btn-secondary"
-                      type="button"
-                      onClick={() => setDeleteRoomIds([])}
-                    >
-                      Clear selection
-                    </button>
+                    <button className="btn btn-secondary" type="button" onClick={() => setDeleteRoomIds([])}>Clear selection</button>
                   </div>
                 </div>
               </div>
@@ -1606,9 +1423,7 @@ export default function AdminDashboard() {
           <div style={{ overflowX: "auto" }}>
             <table style={styles.table}>
               <thead>
-                <tr>
-                  {["Room No.", "Block", "Category", "Price", "Status", ""].map((h) => <th key={h} style={styles.th}>{h}</th>)}
-                </tr>
+                <tr>{["Room No.", "Block", "Category", "Price", "Status", ""].map((h) => <th key={h} style={styles.th}>{h}</th>)}</tr>
               </thead>
               <tbody>
                 {filteredRooms.map((r) => {
@@ -1625,13 +1440,9 @@ export default function AdminDashboard() {
                       </td>
                       <td style={styles.td}>
                         <select value={r.status} onChange={(e) => updateRoomStatus(r._id, e.target.value)}
-                          style={{
-                            width: "100%", padding: "6px 10px", borderRadius: "6px", border: "1px solid transparent", fontSize: "13px",
+                          style={{ width: "100%", padding: "6px 10px", borderRadius: "6px", border: "1px solid transparent", fontSize: "13px",
                             backgroundColor: r.status === "available" ? "#c6f6d5" : r.status === "booked" ? "#fed7d7" : "#fefcbf",
-                            color: r.status === "available" ? "#276749" : r.status === "booked" ? "#9b2c2c" : "#744210",
-                            fontWeight: "700",
-                            cursor: "pointer"
-                          }}>
+                            color: r.status === "available" ? "#276749" : r.status === "booked" ? "#9b2c2c" : "#744210", fontWeight: "700", cursor: "pointer" }}>
                           <option value="available" style={{ backgroundColor: "#c6f6d5", color: "#276749", fontWeight: "700" }}>🟢 Available</option>
                           <option value="booked" style={{ backgroundColor: "#fed7d7", color: "#9b2c2c", fontWeight: "700" }}>🔴 Booked</option>
                           <option value="maintenance" style={{ backgroundColor: "#fefcbf", color: "#744210", fontWeight: "700" }}>🟡 Maintenance</option>
@@ -1664,9 +1475,7 @@ export default function AdminDashboard() {
               <div>
                 <label style={{ fontSize: "12px", display: "block", marginBottom: "3px" }}>Category</label>
                 <input list="edit-room-categories" value={editRoomForm.category || ""} onChange={(e) => setEditRoomForm((f) => ({ ...f, category: e.target.value }))} style={{ width: "100%", marginBottom: 0 }} />
-                <datalist id="edit-room-categories">
-                  {categories.map((c) => <option key={c._id} value={c.name} />)}
-                </datalist>
+                <datalist id="edit-room-categories">{categories.map((c) => <option key={c._id} value={c.name} />)}</datalist>
               </div>
               {knownBlocks.length > 0 && (
                 <div>
@@ -1701,53 +1510,139 @@ export default function AdminDashboard() {
         </div>
       )}
 
+      {/* CLIENTS TAB — full details + search */}
       {tab === "Clients" && (
         <>
-          <div style={{ marginBottom: "16px" }}>
-            <input placeholder="🔍 Search by name or email..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ maxWidth: "400px", marginBottom: 0 }} />
-            {clientMsg && <span className="success" style={{ marginLeft: "12px" }}>✅ {clientMsg}</span>}
-            {clientError && <span className="error" style={{ marginLeft: "12px" }}>⚠️ {clientError}</span>}
+          <div style={{ marginBottom: "16px", display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
+            <input placeholder="🔍 Search name, email, phone, nationality, ID, position, institution..." value={search} onChange={(e) => setSearch(e.target.value)} style={{ maxWidth: "500px", marginBottom: 0, flex: 1 }} />
+            <span style={{ color: "#888", fontSize: "13px" }}>{filteredClients.length} user{filteredClients.length !== 1 ? "s" : ""}</span>
+            {clientMsg && <span className="success">✅ {clientMsg}</span>}
+            {clientError && <span className="error">⚠️ {clientError}</span>}
           </div>
+
           <div style={{ overflowX: "auto" }}>
             <table style={styles.table}>
               <thead>
-                <tr>{["Name", "Role", "Email", "Phone", "Joined", "Bookings", "Total Spent"].map((h) => <th key={h} style={styles.th}>{h}</th>)}</tr>
+                <tr>{["Name", "Role", "Email", "Phone", "Nationality", "Joined", "Bookings", "Total Spent", ""].map((h) => <th key={h} style={styles.th}>{h}</th>)}</tr>
               </thead>
               <tbody>
-                {clients
-                  .filter((c) => c.name?.toLowerCase().includes(search.toLowerCase()) || c.email?.toLowerCase().includes(search.toLowerCase()))
-                  .map((c) => {
-                    const clientBookings = bookings.filter((b) => b.client?._id === c._id || b.client?.email === c.email);
-                    const totalSpent = clientBookings.filter((b) => b.paymentStatus === "paid").reduce((s, b) => s + b.totalPrice, 0);
-                    const isSelf = c._id === currentUserId;
-                    return (
-                      <tr key={c._id}>
-                        <td style={styles.td}><strong>{c.name}</strong></td>
-                        <td style={styles.td}>
-                          {isSelf ? (
-                            <span style={{ background: "#e9d8fd", color: "#553c9a", padding: "4px 10px", borderRadius: "20px", fontSize: "12px", fontWeight: "600" }}>{c.role} (you)</span>
-                          ) : (
-                            <button title={c.role === "admin" ? "Click to remove admin access" : "Click to make this person an admin"}
-                              onClick={() => c.role === "admin"
-                                ? askConfirm(`Remove admin access from ${c.name}? They'll become a regular client.`, () => setClientRole(c._id, "client", c.name))
-                                : askConfirm(`Make ${c.name} an admin?`, () => setClientRole(c._id, "admin", c.name))}
-                              style={{ background: c.role === "admin" ? "#e9d8fd" : "#bee3f8", color: c.role === "admin" ? "#553c9a" : "#2a69ac", padding: "4px 10px", borderRadius: "20px", fontSize: "12px", fontWeight: "600", border: "none", cursor: "pointer", textDecoration: "underline dotted" }}>
-                              {c.role} ✎
-                            </button>
-                          )}
-                        </td>
-                        <td style={styles.td}>{c.email}</td>
-                        <td style={styles.td}>{c.phone || "N/A"}</td>
-                        <td style={styles.td}>{new Date(c.createdAt).toDateString()}</td>
-                        <td style={styles.td}>{clientBookings.length}</td>
-                        <td style={{ ...styles.td, fontWeight: "600", color: "#b8860b" }}>{fmt(totalSpent)}</td>
-                      </tr>
-                    );
-                  })}
-                {clients.length === 0 && <tr><td colSpan="7" style={{ ...styles.td, textAlign: "center", color: "#888", padding: "40px" }}>No clients registered yet</td></tr>}
+                {filteredClients.map((c) => {
+                  const clientBookings = bookings.filter((b) => b.client?._id === c._id || b.client?.email === c.email);
+                  const totalSpent = clientBookings.filter((b) => b.paymentStatus === "paid").reduce((s, b) => s + b.totalPrice, 0);
+                  const isSelf = c._id === currentUserId;
+                  return (
+                    <tr key={c._id}>
+                      <td style={styles.td}><strong>{c.name}</strong></td>
+                      <td style={styles.td}>
+                        {isSelf ? (
+                          <span style={{ background: "#e9d8fd", color: "#553c9a", padding: "4px 10px", borderRadius: "20px", fontSize: "12px", fontWeight: "600" }}>{c.role} (you)</span>
+                        ) : (
+                          <button title={c.role === "admin" ? "Click to remove admin access" : "Click to make this person an admin"}
+                            onClick={() => c.role === "admin"
+                              ? askConfirm(`Remove admin access from ${c.name}? They'll become a regular client.`, () => setClientRole(c._id, "client", c.name))
+                              : askConfirm(`Make ${c.name} an admin?`, () => setClientRole(c._id, "admin", c.name))}
+                            style={{ background: c.role === "admin" ? "#e9d8fd" : "#bee3f8", color: c.role === "admin" ? "#553c9a" : "#2a69ac", padding: "4px 10px", borderRadius: "20px", fontSize: "12px", fontWeight: "600", border: "none", cursor: "pointer", textDecoration: "underline dotted" }}>
+                            {c.role} ✎
+                          </button>
+                        )}
+                      </td>
+                      <td style={styles.td}>{c.email}</td>
+                      <td style={styles.td}>{c.phone || "—"}</td>
+                      <td style={styles.td}>{c.nationality || "—"}</td>
+                      <td style={styles.td}>{new Date(c.createdAt).toDateString()}</td>
+                      <td style={styles.td}>{clientBookings.length}</td>
+                      <td style={{ ...styles.td, fontWeight: "600", color: "#b8860b" }}>{fmt(totalSpent)}</td>
+                      <td style={styles.td}>
+                        <button className="btn btn-secondary" style={{ padding: "4px 10px", fontSize: "11px" }} onClick={() => setViewingClient(c)}>👁 View</button>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filteredClients.length === 0 && <tr><td colSpan="9" style={{ ...styles.td, textAlign: "center", color: "#888", padding: "40px" }}>No clients found.</td></tr>}
               </tbody>
             </table>
           </div>
+
+          {viewingClient && (
+            <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", zIndex: 3600, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }} onClick={() => setViewingClient(null)}>
+              <div style={{ background: "#fff", width: "min(620px, 100%)", borderRadius: "14px", padding: "24px", maxHeight: "90vh", overflowY: "auto" }} onClick={(e) => e.stopPropagation()}>
+                <div style={{ display: "flex", justifyContent: "space-between", alignItems: "start", marginBottom: "18px" }}>
+                  <div>
+                    <h3 style={{ margin: "0 0 4px" }}>👤 {viewingClient.name}</h3>
+                    <p style={{ margin: 0, color: "#666", fontSize: "13px" }}>User details</p>
+                  </div>
+                  <button className="btn btn-secondary" style={{ padding: "4px 10px", fontSize: "12px" }} onClick={() => setViewingClient(null)}>✕</button>
+                </div>
+
+                <div style={{ marginBottom: "18px" }}>
+                  <h4 style={{ margin: "0 0 8px", fontSize: "14px", color: "#b8860b", textTransform: "uppercase", letterSpacing: "1px" }}>Personal</h4>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "13px" }}>
+                    <div><strong>Name:</strong> {viewingClient.name || "—"}</div>
+                    <div><strong>Email:</strong> {viewingClient.email || "—"}</div>
+                    <div><strong>Phone:</strong> {viewingClient.phone || "—"}</div>
+                    <div><strong>National ID / Passport:</strong> {viewingClient.nationalIdOrPassport || "—"}</div>
+                    <div><strong>Nationality:</strong> {viewingClient.nationality || "—"}</div>
+                    <div><strong>Role:</strong> {viewingClient.role || "client"}</div>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: "18px" }}>
+                  <h4 style={{ margin: "0 0 8px", fontSize: "14px", color: "#b8860b", textTransform: "uppercase", letterSpacing: "1px" }}>Background</h4>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "13px" }}>
+                    <div><strong>Position / Job:</strong> {viewingClient.position || "—"}</div>
+                    <div><strong>Institution / Address:</strong> {viewingClient.addressOrInstitution || "—"}</div>
+                    <div style={{ gridColumn: "1 / -1" }}><strong>Purpose of visit:</strong> {viewingClient.purposeOfVisit || "—"}</div>
+                  </div>
+                </div>
+
+                <div style={{ marginBottom: "18px" }}>
+                  <h4 style={{ margin: "0 0 8px", fontSize: "14px", color: "#b8860b", textTransform: "uppercase", letterSpacing: "1px" }}>Account</h4>
+                  <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: "10px", fontSize: "13px" }}>
+                    <div><strong>Joined:</strong> {new Date(viewingClient.createdAt).toLocaleString()}</div>
+                    <div><strong>Last updated:</strong> {viewingClient.updatedAt ? new Date(viewingClient.updatedAt).toLocaleString() : "—"}</div>
+                    <div><strong>Status:</strong> {viewingClient.deletedAt ? "Deleted" : "Active"}</div>
+                    <div><strong>User ID:</strong> <span style={{ fontSize: "11px", color: "#888" }}>{viewingClient._id}</span></div>
+                  </div>
+                </div>
+
+                <div>
+                  <h4 style={{ margin: "0 0 8px", fontSize: "14px", color: "#b8860b", textTransform: "uppercase", letterSpacing: "1px" }}>Bookings</h4>
+                  {(() => {
+                    const clientBookings = bookings.filter((b) => b.client?._id === viewingClient._id || b.client?.email === viewingClient.email);
+                    const totalSpent = clientBookings.filter((b) => b.paymentStatus === "paid").reduce((s, b) => s + b.totalPrice, 0);
+                    if (!clientBookings.length) return <p style={{ fontSize: "13px", color: "#888" }}>No bookings yet.</p>;
+                    return (
+                      <>
+                        <div style={{ fontSize: "13px", marginBottom: "8px" }}>
+                          <strong>{clientBookings.length}</strong> booking{clientBookings.length > 1 ? "s" : ""} — Total paid: <strong style={{ color: "#b8860b" }}>{fmt(totalSpent)}</strong>
+                        </div>
+                        <div style={{ maxHeight: "200px", overflowY: "auto", border: "1px solid #eee", borderRadius: "8px" }}>
+                          {clientBookings.slice(0, 10).map((b) => (
+                            <div key={b._id} style={{ padding: "8px 12px", borderBottom: "1px solid #f0f0f0", fontSize: "12px" }}>
+                              <div style={{ display: "flex", justifyContent: "space-between", marginBottom: "2px" }}>
+                                <strong>{b.room?.roomNumber ? `Room ${b.room.roomNumber}` : b.category || "—"}</strong>
+                                <span style={{ color: "#b8860b", fontWeight: "600" }}>{fmt(b.totalPrice)}</span>
+                              </div>
+                              <div style={{ color: "#666" }}>
+                                {new Date(b.checkIn).toLocaleDateString()} → {new Date(b.checkOut).toLocaleDateString()} · <span style={{ fontWeight: "600" }}>{b.status}</span>
+                              </div>
+                            </div>
+                          ))}
+                          {clientBookings.length > 10 && (
+                            <div style={{ padding: "8px 12px", fontSize: "12px", color: "#888", textAlign: "center" }}>+ {clientBookings.length - 10} more</div>
+                          )}
+                        </div>
+                      </>
+                    );
+                  })()}
+                </div>
+
+                <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end", marginTop: "18px" }}>
+                  <button className="btn btn-secondary" onClick={() => setViewingClient(null)}>Close</button>
+                </div>
+              </div>
+            </div>
+          )}
         </>
       )}
 
@@ -1793,9 +1688,7 @@ export default function AdminDashboard() {
         <>
           <div className="card" style={{ padding: "16px", marginBottom: "20px" }}>
             <h4 style={{ margin: "0 0 10px" }}>📝 Custom Survey Questions</h4>
-            <p style={{ color: "#666", fontSize: "13px", marginBottom: "12px" }}>
-              Open-ended questions clients see alongside their star rating.
-            </p>
+            <p style={{ color: "#666", fontSize: "13px", marginBottom: "12px" }}>Open-ended questions clients see alongside their star rating.</p>
             <div style={{ display: "flex", gap: "8px", marginBottom: "12px", flexWrap: "wrap" }}>
               <input value={newSurveyQuestion} onChange={(e) => setNewSurveyQuestion(e.target.value)} placeholder="e.g. What could we improve about your stay?" style={{ flex: 1, minWidth: "240px", marginBottom: 0 }} />
               <button className="btn btn-primary" onClick={addSurveyQuestion}>+ Add Question</button>
@@ -1813,9 +1706,7 @@ export default function AdminDashboard() {
                   </div>
                 ))}
               </div>
-            ) : (
-              <p style={{ color: "#999", fontSize: "13px" }}>No custom questions yet.</p>
-            )}
+            ) : (<p style={{ color: "#999", fontSize: "13px" }}>No custom questions yet.</p>)}
           </div>
 
           <div style={{ marginBottom: "16px" }}>
@@ -1849,7 +1740,6 @@ export default function AdminDashboard() {
         </>
       )}
 
-      {/* LANDING TAB — hero image manager */}
       {tab === "Landing" && (
         <>
           <div className="card" style={{ padding: "20px", marginBottom: "20px" }}>
@@ -1860,12 +1750,9 @@ export default function AdminDashboard() {
             </p>
 
             <div style={{ display: "flex", gap: "8px", marginBottom: "14px", flexWrap: "wrap", alignItems: "center" }}>
-              <input
-                type="file"
-                accept="image/jpeg,image/png,image/webp"
+              <input type="file" accept="image/jpeg,image/png,image/webp"
                 onChange={(e) => { uploadHeroImage(e.target.files?.[0]); e.target.value = ""; }}
-                disabled={heroUploading}
-              />
+                disabled={heroUploading} />
               {heroUploading && <span style={{ fontSize: "13px", color: "#666" }}>Uploading…</span>}
             </div>
 
@@ -1880,9 +1767,7 @@ export default function AdminDashboard() {
                   <div key={url + i} style={{ border: "1px solid #e2e8f0", borderRadius: "10px", overflow: "hidden", background: "#fff" }}>
                     <div style={{ position: "relative", height: "140px", background: "#f8f9fa" }}>
                       <img src={url} alt={`Hero ${i + 1}`} style={{ width: "100%", height: "100%", objectFit: "cover", display: "block" }} />
-                      <span style={{ position: "absolute", top: "8px", left: "8px", background: "#b8860b", color: "#fff", padding: "3px 9px", borderRadius: "20px", fontSize: "11px", fontWeight: "700" }}>
-                        #{i + 1}
-                      </span>
+                      <span style={{ position: "absolute", top: "8px", left: "8px", background: "#b8860b", color: "#fff", padding: "3px 9px", borderRadius: "20px", fontSize: "11px", fontWeight: "700" }}>#{i + 1}</span>
                     </div>
                     <div style={{ display: "flex", gap: "4px", padding: "8px" }}>
                       <button className="btn btn-secondary" style={{ flex: 1, padding: "5px 8px", fontSize: "11px" }} onClick={() => moveHeroImage(i, -1)} disabled={i === 0}>↑</button>

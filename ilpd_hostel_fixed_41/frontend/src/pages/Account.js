@@ -2,6 +2,37 @@ import React, { useState } from "react";
 import { useNavigate } from "react-router-dom";
 import API from "../api/axios";
 
+function PasswordInput({ value, onChange, autoFocus }) {
+  const [visible, setVisible] = useState(false);
+  return (
+    <div style={{ position: "relative" }}>
+      <input
+        type={visible ? "text" : "password"}
+        value={value}
+        onChange={onChange}
+        autoFocus={autoFocus}
+        style={{ ...inp, paddingRight: "42px" }}
+      />
+      <span
+        onClick={() => setVisible((v) => !v)}
+        title={visible ? "Hide password" : "Show password"}
+        style={{
+          position: "absolute",
+          top: "50%",
+          right: "12px",
+          transform: "translateY(-50%)",
+          cursor: "pointer",
+          fontSize: "16px",
+          color: visible ? "#b8860b" : "#888",
+          userSelect: "none",
+        }}
+      >
+        👁
+      </span>
+    </div>
+  );
+}
+
 export default function Account({ user, logout }) {
   const navigate = useNavigate();
 
@@ -17,17 +48,13 @@ export default function Account({ user, logout }) {
 
   const handleChangePassword = async (e) => {
     e.preventDefault();
-    setPwMsg("");
-    setPwErr("");
+    setPwMsg(""); setPwErr("");
     if (!pwForm.current || !pwForm.next || !pwForm.confirm) return setPwErr("Please fill in all fields.");
     if (pwForm.next.length < 6) return setPwErr("New password must be at least 6 characters.");
     if (pwForm.next !== pwForm.confirm) return setPwErr("New password and confirmation do not match.");
     setPwSaving(true);
     try {
-      await API.put("/auth/change-password", {
-        currentPassword: pwForm.current,
-        newPassword: pwForm.next,
-      });
+      await API.put("/auth/change-password", { currentPassword: pwForm.current, newPassword: pwForm.next });
       setPwMsg("Password updated successfully.");
       setPwForm({ current: "", next: "", confirm: "" });
     } catch (err) {
@@ -70,11 +97,13 @@ export default function Account({ user, logout }) {
           <h3 style={{ margin: "0 0 16px" }}>Change Password</h3>
           <form onSubmit={handleChangePassword}>
             <label style={lbl}>Current password</label>
-            <input type="password" value={pwForm.current} onChange={(e) => setPwForm({ ...pwForm, current: e.target.value })} style={inp} />
+            <PasswordInput value={pwForm.current} onChange={(e) => setPwForm({ ...pwForm, current: e.target.value })} />
+
             <label style={lbl}>New password</label>
-            <input type="password" value={pwForm.next} onChange={(e) => setPwForm({ ...pwForm, next: e.target.value })} style={inp} />
+            <PasswordInput value={pwForm.next} onChange={(e) => setPwForm({ ...pwForm, next: e.target.value })} />
+
             <label style={lbl}>Confirm new password</label>
-            <input type="password" value={pwForm.confirm} onChange={(e) => setPwForm({ ...pwForm, confirm: e.target.value })} style={inp} />
+            <PasswordInput value={pwForm.confirm} onChange={(e) => setPwForm({ ...pwForm, confirm: e.target.value })} />
 
             {pwMsg && <p style={{ color: "#276749", fontSize: "13px", marginTop: "10px" }}>✅ {pwMsg}</p>}
             {pwErr && <p style={{ color: "#c53030", fontSize: "13px", marginTop: "10px" }}>⚠️ {pwErr}</p>}
@@ -88,8 +117,7 @@ export default function Account({ user, logout }) {
         <div style={{ background: "#fff5f5", borderRadius: "12px", border: "1px solid #fed7d7", padding: "20px" }}>
           <h3 style={{ margin: "0 0 8px", color: "#9b2c2c" }}>Danger Zone</h3>
           <p style={{ color: "#666", fontSize: "13px", marginBottom: "16px" }}>
-            Deleting your account will remove your access permanently. Your booking history stays for the hostel's
-            records, but you will not be able to log in again with this account.
+            Deleting your account will remove your access permanently. Your booking history stays for the hostel's records.
           </p>
           <button
             onClick={() => { setShowDelete(true); setDeleteErr(""); setDeletePassword(""); }}
@@ -105,19 +133,15 @@ export default function Account({ user, logout }) {
           <div style={modal} onClick={(e) => e.stopPropagation()}>
             <h3 style={{ marginTop: 0, color: "#9b2c2c" }}>Delete Account?</h3>
             <p style={{ color: "#444", fontSize: "14px", lineHeight: "1.6" }}>
-              This action cannot be undone. To confirm, enter your password below.
+              This cannot be undone. Enter your password to confirm.
             </p>
             <form onSubmit={handleDelete}>
               <label style={lbl}>Password</label>
-              <input type="password" value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} style={inp} autoFocus />
+              <PasswordInput value={deletePassword} onChange={(e) => setDeletePassword(e.target.value)} autoFocus />
               {deleteErr && <p style={{ color: "#c53030", fontSize: "13px", marginTop: "10px" }}>⚠️ {deleteErr}</p>}
               <div style={{ display: "flex", gap: "10px", marginTop: "16px" }}>
-                <button type="button" onClick={() => setShowDelete(false)} style={{ ...btn, background: "#f0f0f0", color: "#333" }}>
-                  Cancel
-                </button>
-                <button type="submit" disabled={deleteSaving} style={{ ...btn, background: "#c53030" }}>
-                  {deleteSaving ? "Deleting..." : "Delete My Account"}
-                </button>
+                <button type="button" onClick={() => setShowDelete(false)} style={{ ...btn, background: "#f0f0f0", color: "#333" }}>Cancel</button>
+                <button type="submit" disabled={deleteSaving} style={{ ...btn, background: "#c53030" }}>{deleteSaving ? "Deleting..." : "Delete My Account"}</button>
               </div>
             </form>
           </div>

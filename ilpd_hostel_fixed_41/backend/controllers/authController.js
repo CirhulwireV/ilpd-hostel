@@ -100,20 +100,13 @@ exports.deleteAccount = async (req, res) => {
     if (user.role === "admin") {
       const otherAdmins = await User.countDocuments({ role: "admin", deletedAt: null, _id: { $ne: user._id } });
       if (otherAdmins === 0) {
-        return res.status(400).json({
-          message: "You're the only admin. Promote another user to admin first, then delete your account."
-        });
+        return res.status(400).json({ message: "You're the only admin. Promote another user to admin first, then delete your account." });
       }
     }
 
-    const activeCount = await Booking.countDocuments({
-      client: user._id,
-      status: { $in: ACTIVE_STATUSES },
-    });
+    const activeCount = await Booking.countDocuments({ client: user._id, status: { $in: ACTIVE_STATUSES } });
     if (activeCount > 0) {
-      return res.status(400).json({
-        message: `You have ${activeCount} active booking${activeCount > 1 ? "s" : ""}. Please wait until they are completed or cancelled, then try again.`
-      });
+      return res.status(400).json({ message: `You have ${activeCount} active booking${activeCount > 1 ? "s" : ""}. Please wait until they are completed or cancelled, then try again.` });
     }
 
     user.deletedAt = new Date();
