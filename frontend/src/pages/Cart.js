@@ -10,6 +10,8 @@ export default function Cart({ user }) {
   const [loading, setLoading] = useState(true);
   const [msg, setMsg] = useState("");
   const [err, setErr] = useState("");
+  const [confirmDialog, setConfirmDialog] = useState(null);
+  const askConfirm = (message, onConfirm) => setConfirmDialog({ message, onConfirm });
 
   const loadCart = () => {
     if (!user) { setLoading(false); return; }
@@ -20,7 +22,7 @@ export default function Cart({ user }) {
 
   useEffect(() => { loadCart(); /* eslint-disable-next-line */ }, [user]);
 
-  const removeItem = async (itemId) => {
+  const removeItemConfirmed = async (itemId) => {
     setMsg(""); setErr("");
     try {
       const { data } = await API.delete(`/cart/items/${itemId}`);
@@ -31,7 +33,13 @@ export default function Cart({ user }) {
     }
   };
 
-  const clearCart = async () => {
+  const removeItem = (itemId) => {
+    const item = cart.items.find((i) => String(i._id) === String(itemId));
+    const label = item ? `${item.blockName || item.category || "this item"}` : "this item";
+    askConfirm(`Remove ${label} from your cart?`, () => removeItemConfirmed(itemId));
+  };
+
+  const clearCartConfirmed = async () => {
     setMsg(""); setErr("");
     try {
       const { data } = await API.delete("/cart");
@@ -40,6 +48,11 @@ export default function Cart({ user }) {
     } catch (e) {
       setErr(e.response?.data?.message || "Could not clear cart.");
     }
+  };
+
+  const clearCart = () => {
+    if (!cart.items.length) return;
+    askConfirm(`Remove all ${cart.items.length} item${cart.items.length > 1 ? "s" : ""} from your cart?`, clearCartConfirmed);
   };
 
   const itemTotal = (item) => {
@@ -116,6 +129,18 @@ export default function Cart({ user }) {
       <div className="container" style={{ maxWidth: "1100px" }}>
         {msg && <p style={{ color: "#276749", marginBottom: "12px" }}>✅ {msg}</p>}
         {err && <p style={{ color: "#c53030", marginBottom: "12px" }}>⚠️ {err}</p>}
+
+        {confirmDialog && (
+          <div style={{ position: "fixed", inset: 0, background: "rgba(0,0,0,.55)", zIndex: 4000, display: "flex", alignItems: "center", justifyContent: "center", padding: "20px" }} onClick={() => setConfirmDialog(null)}>
+            <div style={{ background: "#fff", width: "min(420px, 100%)", borderRadius: "14px", padding: "22px" }} onClick={(e) => e.stopPropagation()}>
+              <p style={{ margin: "0 0 20px", fontSize: "14px", color: "#333", whiteSpace: "pre-wrap" }}>{confirmDialog.message}</p>
+              <div style={{ display: "flex", gap: "10px", justifyContent: "flex-end" }}>
+                <button className="btn btn-secondary" onClick={() => setConfirmDialog(null)}>Cancel</button>
+                <button className="btn btn-primary" onClick={() => { const action = confirmDialog.onConfirm; setConfirmDialog(null); action(); }}>Confirm</button>
+              </div>
+            </div>
+          </div>
+        )}
 
         <div style={{ display: "grid", gridTemplateColumns: "1fr 320px", gap: "20px", alignItems: "start" }} className="cart-grid">
           <div style={{ background: "#fff", borderRadius: "8px", padding: "20px 24px" }}>
