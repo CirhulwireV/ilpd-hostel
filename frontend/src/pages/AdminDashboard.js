@@ -73,7 +73,6 @@ export default function AdminDashboard() {
   const [clientError, setClientError] = useState("");
   const [reportError, setReportError] = useState("");
 
-  // ⭐ Client details modal state
   const [viewingClient, setViewingClient] = useState(null);
 
   const [weeklyReport, setWeeklyReport] = useState(null);
@@ -265,7 +264,7 @@ export default function AdminDashboard() {
   const openAllocation = async (booking) => {
     setBookingError(""); setBookingMsg(""); setAllocatingId(booking._id); setAllocateRoomId([]);
     try {
-      const { data } = await API.get("/rooms/available-for-booking", { params: { category: booking.category, accommodationType: booking.accommodationType || "outside_hostel", checkIn: booking.checkIn, checkOut: booking.checkOut } });
+      const { data } = await API.get("/rooms/available-for-booking", { params: { category: booking.category, blockName: booking.blockName, hostelSection: booking.blockName, checkIn: booking.checkIn, checkOut: booking.checkOut } });
       setAllocationRooms(data);
       if (!data.length) setBookingError("No room is available for these booking dates.");
     } catch (err) { setAllocationRooms([]); setBookingError(err.response?.data?.message || "Unable to load available rooms."); }
@@ -339,7 +338,7 @@ export default function AdminDashboard() {
   const openReallocate = async (booking) => {
     setBookingError(""); setBookingMsg(""); setReallocatingId(booking._id); setReallocateRoomId("");
     try {
-      const { data } = await API.get("/rooms/available-for-booking", { params: { category: booking.category, accommodationType: booking.accommodationType || "outside_hostel", checkIn: booking.checkIn, checkOut: booking.checkOut } });
+      const { data } = await API.get("/rooms/available-for-booking", { params: { category: booking.category, blockName: booking.blockName, hostelSection: booking.blockName, checkIn: booking.checkIn, checkOut: booking.checkOut } });
       setReallocateRooms(data.filter((r) => String(r._id) !== String(booking.room?._id || booking.room)));
     } catch (err) { setReallocateRooms([]); setBookingError(err.response?.data?.message || "Unable to load available rooms."); }
   };
@@ -386,7 +385,7 @@ export default function AdminDashboard() {
     });
   };
 
-  const deleteRooms = (ids) => {
+    const deleteRooms = (ids) => {
     if (!ids || !ids.length) { setAddRoomError("Select at least one room to delete."); return; }
     const picked = rooms.filter((r) => ids.includes(r._id));
     const names = picked.map((r) => `Room ${r.roomNumber}${r.hostelSection ? ` — ${r.hostelSection}` : ""}`).join("\n");
@@ -708,7 +707,6 @@ export default function AdminDashboard() {
     s.comments?.toLowerCase().includes(search.toLowerCase())
   );
 
-  // ⭐ Client search — searches across ALL user fields
   const filteredClients = clients.filter((c) => {
     const q = search.toLowerCase().trim();
     if (!q) return true;
@@ -724,7 +722,8 @@ export default function AdminDashboard() {
       c.role?.toLowerCase().includes(q)
     );
   });
-    return (
+
+  return (
     <div className="container" style={{ padding: "40px 20px" }}>
       <div style={{ marginBottom: "24px" }}>
         <h2 style={{ fontSize: "28px", fontWeight: "700" }}>Admin Dashboard</h2>
@@ -758,7 +757,6 @@ export default function AdminDashboard() {
         ))}
       </div>
 
-      {/* OVERVIEW TAB */}
       {tab === "Overview" && (
         <>
           {(() => {
@@ -852,7 +850,6 @@ export default function AdminDashboard() {
         </>
       )}
 
-      {/* REPORTS TAB */}
       {tab === "Reports" && (
         <>
           <div style={{ marginBottom: "32px" }}>
@@ -963,7 +960,6 @@ export default function AdminDashboard() {
         </>
       )}
 
-      {/* BOOKINGS TAB */}
       {tab === "Bookings" && (
         <>
           <div style={{ marginBottom: "16px", display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
@@ -1133,7 +1129,6 @@ export default function AdminDashboard() {
         </>
       )}
 
-      {/* ROOMS TAB */}
       {tab === "Rooms" && (
         <>
           <div style={{ marginBottom: "16px", display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
@@ -1510,7 +1505,6 @@ export default function AdminDashboard() {
         </div>
       )}
 
-      {/* CLIENTS TAB — full details + search */}
       {tab === "Clients" && (
         <>
           <div style={{ marginBottom: "16px", display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
