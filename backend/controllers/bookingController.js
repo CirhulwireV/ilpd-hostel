@@ -425,7 +425,7 @@ exports.reallocateRoom = async (req, res) => {
       return res.status(400).json({ message: "The booking is already assigned to this room." });
 
     const newRoom = await Room.findOneAndUpdate(
-      { _id: roomId, category: booking.category, hostelSection: booking.blockName, status: "available" },
+      { _id: roomId, ...(booking.category && booking.category !== booking.blockName ? { category: booking.category } : {}), hostelSection: booking.blockName, status: "available" },
       { $set: { status: "booked" } },
       { new: true }
     );
@@ -459,7 +459,7 @@ exports.allocateAndConfirm = async (req, res) => {
     for (const roomId of roomIds) {
       const room = await Room.findOneAndUpdate({
         _id: roomId,
-        category: booking.category,
+        ...(booking.category && booking.category !== booking.blockName ? { category: booking.category } : {}),
         hostelSection: booking.blockName,
         status: "available",
       }, { $set: { status: "booked" } }, { new: true });
