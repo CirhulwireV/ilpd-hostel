@@ -61,11 +61,12 @@ export default function Rooms({ user }) {
       ? { icon: "🏨", color: "#b8860b", bg: "#fff8e6", tag: "Available", desc: `Comfortable room in ${r.blockName} with all essential amenities.`, amenities: ["Bed", "TV", "Free WiFi", "Private Bathroom"] }
       : (CATEGORY_DISPLAY[r.category] || { icon: "🏨", color: "#4a90d9", bg: "#e8f4fd", tag: "", desc: "", amenities: [] });
     return {
-      key: `${r.blockName}-${r.category}`,
-      name: r.category,
+      key: `${r.blockName}-${r.category ?? "flat"}`,
+      name: r.category ?? r.blockName,
       displayName: r.blockName,
       price: r.price,
       usesCategories: r.usesCategories,
+      image: r.image || null,
       ...display,
     };
   });
@@ -208,7 +209,11 @@ export default function Rooms({ user }) {
           {cards.map((cat) => (
             <div key={cat.key} style={styles.card}>
               <div style={{ position: "relative", height: "220px", background: "#eee", display: "flex", alignItems: "center", justifyContent: "center", overflow: "hidden" }}>
-                <span style={{ fontSize: "42px", color: "#bbb" }}>🏨</span>
+                {cat.image ? (
+                  <img src={cat.image} alt={selectedBlockName} style={{ width: "100%", height: "100%", objectFit: "cover" }} onError={(e) => { e.target.style.display = "none"; }} />
+                ) : (
+                  <span style={{ fontSize: "42px", color: "#bbb" }}>🏨</span>
+                )}
                 <span style={{ ...styles.cardTag, background: cat.color }}>{cat.tag}</span>
                 <span style={{ position: "absolute", top: "10px", left: "10px", background: "rgba(0,0,0,.65)", color: "#fff", fontSize: "11px", fontWeight: "700", padding: "4px 9px", borderRadius: "999px" }}>
                   🏨 {selectedBlockName}
@@ -217,7 +222,7 @@ export default function Rooms({ user }) {
               <div style={styles.cardBody}>
                 <div style={styles.cardTop}>
                   <span style={{ fontWeight: "700", fontSize: "20px" }}>{cat.icon} {cat.displayName}</span>
-                  <span style={{ ...styles.catBadge, background: cat.bg, color: cat.color }}>{cat.name}</span>
+                  {cat.usesCategories && <span style={{ ...styles.catBadge, background: cat.bg, color: cat.color }}>{cat.name}</span>}
                 </div>
                 <p style={{ color: "#555", fontSize: "14px", lineHeight: "1.6", margin: "10px 0" }}>{cat.desc}</p>
                 <div style={styles.amenitiesRow}>{(cat.amenities || []).map((a) => <span key={a} style={styles.amenityTag}>{a}</span>)}</div>

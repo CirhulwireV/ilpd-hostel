@@ -2,26 +2,12 @@ const Block = require("../models/Block");
 const Room = require("../models/Room");
 const Category = require("../models/Category");
 
-// Legacy exports kept so any older import doesn't crash.
 const ACCOMMODATION_TYPES = {
   outside_hostel: { label: "Hostel Block (Outside ILPD Building)", billingPeriod: "month" },
   ilpd_building: { label: "ILPD Institution Building", billingPeriod: "night" },
 };
 const DEFAULT_ACCOMMODATION_TYPE = "outside_hostel";
 const getAccommodationConfig = () => ({ billingPeriod: "month" });
-
-// ─────────────────────────────────────────────────────────────────────────────
-// BLOCK-AWARE PRICING
-//
-// Rules:
-//   • Block.usesCategories === false → flat block price = cheapest active
-//     Room.price inside that block.
-//   • Block.usesCategories === true  → per-category price from Category.price,
-//     falling back to cheapest Room.price in that block+category.
-//
-// billingPeriod comes from Block.billingType:
-//   "per_night" → "night", "per_month" → "month"
-// ─────────────────────────────────────────────────────────────────────────────
 
 const billingPeriodForBlock = (block) => (block?.billingType === "per_night" ? "night" : "month");
 
@@ -42,7 +28,17 @@ const getFlatCategoryRateInBlock = async (blockName, category) => {
   return Number(room?.price || 0);
 };
 
-// Returns one row per (block, category) pair.
+const getBlockImage = async (blockName, category) => {
+  const filter = { hostelSection: blockName, active: true };
+  if (category && category !== blockName) filter.category = category;
+  const rooms = await Room.find(filter).select("images imageData").lean();
+  for (const r of rooms) {
+    if (Array.isArray(r.images) && r.images.length && r.images[0]) return r.images[0];
+    if (r.imageData) return r.imageData;
+  }
+  return null;
+};
+
 const getAvailableRates = async () => {
   const blocks = await Block.find({ active: true }).sort({ name: 1 }).lean();
   const rates = [];
@@ -59,6 +55,7 @@ const getAvailableRates = async () => {
           price,
           billingPeriod,
           usesCategories: false,
+          image: await getBlockImage(block.name, null),
         });
       }
       continue;
@@ -85,6 +82,7 @@ const getAvailableRates = async () => {
           price,
           billingPeriod,
           usesCategories: true,
+          image: await getBlockImage(block.name, c.name),
         });
       }
     }
@@ -101,6 +99,7 @@ const getAvailableRates = async () => {
           price,
           billingPeriod,
           usesCategories: true,
+          image: await getBlockImage(block.name, catName),
         });
       }
     }
@@ -109,7 +108,6 @@ const getAvailableRates = async () => {
   return rates;
 };
 
-// Single lookup used by bookingController to decide what to charge.
 const getBookingRate = async ({ blockName, category }) => {
   if (!blockName) return null;
   const block = await Block.findOne({ name: blockName, active: true }).lean();
@@ -138,10 +136,6 @@ const getBookingRate = async ({ blockName, category }) => {
   if (!rate) return null;
   return { rate, billingPeriod, usesCategories: true, categoryLabel: category };
 };
-
-// ─────────────────────────────────────────────────────────────────────────────
-// Date + refund helpers
-// ─────────────────────────────────────────────────────────────────────────────
 
 const CANCELLATION_DEADLINE_DAYS = Math.max(0, Number(process.env.CANCELLATION_DEADLINE_DAYS || 7));
 const ACTIVE_BOOKING_STATUSES = ["confirmed", "checked-in"];
