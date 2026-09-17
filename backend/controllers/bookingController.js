@@ -102,7 +102,7 @@ const processRefund = async (booking, refundAmount, reasonMessage) => {
 const getAvailableRoomsForDates = async (category, checkIn, checkOut, hostelSection) => {
   const filter = { status: "available" };
   if (hostelSection) filter.hostelSection = hostelSection;
-  if (category) filter.category = category;
+  if (category && category !== hostelSection) filter.category = category;
   const rooms = await Room.find(filter).lean();
   if (!rooms.length) return [];
 
