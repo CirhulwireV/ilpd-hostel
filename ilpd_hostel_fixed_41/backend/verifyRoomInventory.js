@@ -1,7 +1,0 @@
-require("dotenv").config();
-const mongoose=require("mongoose");
-mongoose.set("autoIndex",false);
-const Room=require("./models/Room");
-const {INVENTORY}=require("./inventory");
-const key=r=>`${r.accommodationType}|${r.roomNumber}|${r.hostelSection||""}`;
-(async()=>{try{if(!process.env.MONGO_URI)throw new Error("MONGO_URI is required.");await mongoose.connect(process.env.MONGO_URI);const rooms=await Room.find({}).lean();const counts=new Map();for(const r of rooms)counts.set(key(r),(counts.get(key(r))||0)+1);const dup=[...counts].filter(([,n])=>n>1);const allowed=new Set(INVENTORY.map(key));const invalid=rooms.filter(r=>!allowed.has(key(r)));const missing=INVENTORY.filter(s=>!counts.has(key(s)));console.log(`Main House: ${INVENTORY.filter(r=>r.accommodationType==='ilpd_building').length}`);console.log(`AKAGERA: ${INVENTORY.filter(r=>r.hostelSection==='AKAGERA').length}`);console.log(`KARISIMBI: ${INVENTORY.filter(r=>r.hostelSection==='KARISIMBI').length}`);console.log(`Database records: ${rooms.length}`);console.log(`Duplicate identities: ${dup.length}`);console.log(`Invalid inventory records: ${invalid.length}`);console.log(`Missing inventory records: ${missing.length}`);if(dup.length||invalid.length||missing.length)process.exitCode=1;else console.log("Inventory verification PASSED: exactly the authoritative 128 identities are present.");}catch(e){console.error("Verification failed:",e);process.exitCode=1}finally{await mongoose.disconnect().catch(()=>{})}})();
