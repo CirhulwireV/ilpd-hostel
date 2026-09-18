@@ -231,7 +231,14 @@ export default function AdminDashboard() {
     finally { setHeroSaving(false); }
   };
 
-  const removeHeroImage = (i) => { setHeroImages((prev) => prev.filter((_, idx) => idx !== i)); setHeroMsg("Removed. Don't forget to click Save."); };
+  const removeHeroImageConfirmed = (i) => {
+    setHeroImages((prev) => prev.filter((_, idx) => idx !== i));
+    setHeroMsg("Removed. Don't forget to click Save.");
+  };
+
+  const removeHeroImage = (i) => {
+    askConfirm("Remove this image from the landing page slideshow? Click Save afterwards to make it permanent.", () => removeHeroImageConfirmed(i));
+  };
 
   const moveHeroImage = (i, dir) => {
     setHeroImages((prev) => {
@@ -281,13 +288,19 @@ export default function AdminDashboard() {
     } catch (err) { setBookingError(err.response?.data?.message || "Unable to allocate room."); }
   };
 
-  const cancelBooking = async (id) => {
+  const cancelBookingConfirmed = async (id) => {
     try {
       const { data } = await API.post(`/bookings/cancel/${id}`);
       setBookings((prev) => prev.filter((b) => b._id !== id));
       setBookingMsg(data.message); setBookingError("");
       await refreshRooms();
     } catch (err) { setBookingError(err.response?.data?.message || "Unable to cancel booking."); }
+  };
+
+  const cancelBooking = (id) => {
+    const booking = bookings.find((b) => b._id === id);
+    const who = booking?.client?.name ? ` for ${booking.client.name}` : "";
+    askConfirm(`Cancel this booking${who}? Refunds are processed automatically according to policy. This cannot be undone.`, () => cancelBookingConfirmed(id));
   };
 
   const recordCheckin = (id) => {
@@ -385,7 +398,7 @@ export default function AdminDashboard() {
     });
   };
 
-    const deleteRooms = (ids) => {
+  const deleteRooms = (ids) => {
     if (!ids || !ids.length) { setAddRoomError("Select at least one room to delete."); return; }
     const picked = rooms.filter((r) => ids.includes(r._id));
     const names = picked.map((r) => `Room ${r.roomNumber}${r.hostelSection ? ` — ${r.hostelSection}` : ""}`).join("\n");
@@ -1128,8 +1141,7 @@ export default function AdminDashboard() {
           })()}
         </>
       )}
-
-      {tab === "Rooms" && (
+            {tab === "Rooms" && (
         <>
           <div style={{ marginBottom: "16px", display: "flex", gap: "12px", alignItems: "center", flexWrap: "wrap" }}>
             <button className="btn btn-primary" onClick={() => { setShowAddRoom((v) => !v); setAddRoomError(""); setAddRoomAttempted(false); }}>
